@@ -11,7 +11,11 @@ import {
   AlertCircle, 
   LogOut, 
   ArrowLeft,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Edit3,
+  Upload,
+  X,
+  Save
 } from 'lucide-react';
 
 interface AdminViewProps {
@@ -33,7 +37,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState(false);
 
-  // New case form state
+  // Edit / Add state
+  const [editingCaseId, setEditingCaseId] = useState<string | null>(null);
+
+  // Form state
   const [title, setTitle] = useState('');
   const [modality, setModality] = useState<Modality>('chest_xray');
   const [category, setCategory] = useState<'Normal' | 'Common Pathology' | 'Emergency Findings' | 'Post-Procedural'>('Common Pathology');
@@ -53,7 +60,6 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Default demo password is admin123
     if (passwordInput === 'admin123' || passwordInput === 'rad2026') {
       setIsAuthenticated(true);
       sessionStorage.setItem('rad_admin_auth', 'true');
@@ -68,15 +74,64 @@ export const AdminView: React.FC<AdminViewProps> = ({
     sessionStorage.removeItem('rad_admin_auth');
   };
 
-  const handleSubmitNewCase = (e: React.FormEvent) => {
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setImageUrl(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleStartEdit = (c: MedicalCase) => {
+    setEditingCaseId(c.id);
+    setTitle(c.title);
+    setModality(c.modality);
+    setCategory(c.category);
+    setImageUrl(c.imageUrl);
+    setImageAlt(c.imageAlt || c.title);
+    setQuestion(c.question);
+    setDiagnosis(c.diagnosis);
+    setKeyFindings(c.keyFindings ? c.keyFindings.join('\n') : '');
+    setClinicalSignificance(c.clinicalSignificance || '');
+    setDifferentialDiagnosis(c.differentialDiagnosis ? c.differentialDiagnosis.join(', ') : '');
+    setReportingTemplate(c.reportingTemplate || '');
+    setTeachingPoints(c.teachingPoints ? c.teachingPoints.join('\n') : '');
+    setCmeTip(c.cmeTip || '');
+    setDifficulty(c.difficulty);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCaseId(null);
+    setTitle('');
+    setImageUrl('');
+    setImageAlt('');
+    setQuestion('');
+    setDiagnosis('');
+    setKeyFindings('');
+    setClinicalSignificance('');
+    setDifferentialDiagnosis('');
+    setReportingTemplate('');
+    setTeachingPoints('');
+    setCmeTip('');
+  };
+
+  const handleSubmitCase = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !diagnosis || !imageUrl) {
-      alert('Please fill in at least Title, Diagnosis, and Image URL.');
+      alert('Please fill in at least Title, Diagnosis, and Image (URL or uploaded file).');
       return;
     }
 
-    const newCase: MedicalCase = {
-      id: `custom-${Date.now()}`,
+    const caseId = editingCaseId || `custom-${Date.now()}`;
+
+    const updatedCase: MedicalCase = {
+      id: caseId,
       title,
       modality,
       category,
@@ -93,21 +148,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
       difficulty,
     };
 
-    onAddCase(newCase);
-    setSuccessMessage(`Successfully added case: "${title}"!`);
+    onAddCase(updatedCase);
+    setSuccessMessage(
+      editingCaseId 
+        ? `Successfully updated case: "${title}"!` 
+        : `Successfully added case: "${title}"!`
+    );
     
-    // Reset form
-    setTitle('');
-    setImageUrl('');
-    setImageAlt('');
-    setQuestion('');
-    setDiagnosis('');
-    setKeyFindings('');
-    setClinicalSignificance('');
-    setDifferentialDiagnosis('');
-    setReportingTemplate('');
-    setTeachingPoints('');
-    setCmeTip('');
+    handleCancelEdit();
 
     setTimeout(() => setSuccessMessage(''), 4000);
   };
@@ -123,7 +171,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
             </div>
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Admin Portal Login</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Enter admin password to upload and manage radiology teaching cases.
+              Enter admin password to upload, edit, and manage radiology teaching cases.
             </p>
             <div className="mt-2 text-xs bg-slate-100 dark:bg-slate-800 py-1.5 px-3 rounded-lg text-slate-600 dark:text-slate-300 inline-block font-mono">
               Demo Password: <span className="font-bold text-blue-600 dark:text-blue-400">admin123</span>
@@ -184,7 +232,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Admin Case Management Portal</h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Add verified teaching cases, edit radiology parameters, and manage library inventory. ({cases.length} total cases)
+              Upload new cases, edit existing records, and manage library inventory. ({cases.length} total cases)
             </p>
           </div>
         </div>
@@ -213,19 +261,38 @@ export const AdminView: React.FC<AdminViewProps> = ({
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Add New Case Form */}
+        {/* Left Column: Form (Add or Edit) */}
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-xl border border-slate-200 dark:border-slate-800">
-          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
-            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-950 rounded-xl flex items-center justify-center text-blue-600 dark:text-blue-400">
-              <Plus className="w-5 h-5" />
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 mb-6">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                editingCaseId 
+                  ? 'bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400' 
+                  : 'bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400'
+              }`}>
+                {editingCaseId ? <Edit3 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {editingCaseId ? 'Edit Radiology Case' : 'Upload New Radiology Case'}
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {editingCaseId ? `Editing ID: ${editingCaseId}` : 'Fill in clinical and radiological parameters'}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 dark:text-white">Upload New Radiology Case</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Fill in the clinical and radiological parameters</p>
-            </div>
+
+            {editingCaseId && (
+              <button
+                onClick={handleCancelEdit}
+                className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-200 transition-colors flex items-center gap-1.5"
+              >
+                <X className="w-3.5 h-3.5" /> Cancel Edit
+              </button>
+            )}
           </div>
 
-          <form onSubmit={handleSubmitNewCase} className="space-y-6">
+          <form onSubmit={handleSubmitCase} className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -303,21 +370,53 @@ export const AdminView: React.FC<AdminViewProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Image URL * (Direct Wikimedia / Medical URL)
-                </label>
-                <input
-                  type="url"
-                  required
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://upload.wikimedia.org/..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-                />
+            {/* Image Source Section (URL or File Upload) */}
+            <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex-1 w-full">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Image Source (Direct URL or Upload File) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    placeholder="https://upload.wikimedia.org/... or uploaded image data"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="w-full sm:w-auto">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Upload Image File
+                  </label>
+                  <label className="cursor-pointer px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-2 shadow-sm">
+                    <Upload className="w-4 h-4" />
+                    <span>Choose File</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
               </div>
 
+              {imageUrl && (
+                <div className="flex items-center gap-4 pt-2">
+                  <div className="w-20 h-20 rounded-xl bg-slate-200 dark:bg-slate-700 overflow-hidden border border-slate-300 dark:border-slate-600 flex-shrink-0">
+                    <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    <span className="font-bold text-slate-700 dark:text-slate-200">Image Preview Loaded:</span> Ready for publication.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   Image Alt Description
@@ -330,19 +429,19 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                Clinical Question
-              </label>
-              <input
-                type="text"
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="e.g., What radiographic sign indicates free air under the diaphragm?"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-              />
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Clinical Question
+                </label>
+                <input
+                  type="text"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  placeholder="e.g., What radiographic sign indicates free air under the diaphragm?"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -431,9 +530,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
             <button
               type="submit"
-              className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-lg transition-all text-sm flex items-center justify-center gap-2"
+              className={`w-full py-3.5 rounded-xl font-semibold shadow-lg transition-all text-sm flex items-center justify-center gap-2 text-white ${
+                editingCaseId 
+                  ? 'bg-amber-600 hover:bg-amber-700' 
+                  : 'bg-blue-600 hover:bg-blue-700'
+              }`}
             >
-              <Plus className="w-5 h-5" /> Publish New Teaching Case to Library
+              {editingCaseId ? <Save className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+              {editingCaseId ? 'Update Case in Firebase' : 'Publish New Teaching Case to Library'}
             </button>
           </form>
         </div>
@@ -451,7 +555,11 @@ export const AdminView: React.FC<AdminViewProps> = ({
             {cases.map((c) => (
               <div 
                 key={c.id}
-                className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-between gap-3 group"
+                className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 transition-colors ${
+                  editingCaseId === c.id 
+                    ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700' 
+                    : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200/80 dark:border-slate-700/80'
+                }`}
               >
                 <div className="w-12 h-12 rounded-xl bg-slate-200 dark:bg-slate-700 flex-shrink-0 overflow-hidden">
                   <img src={c.imageUrl} alt={c.imageAlt} className="w-full h-full object-cover" />
@@ -471,18 +579,29 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     {c.diagnosis}
                   </h4>
                 </div>
-                <button
-                  onClick={() => {
-                    if (confirm(`Are you sure you want to delete "${c.diagnosis}"?`)) {
-                      onDeleteCase(c.id);
-                    }
-                  }}
-                  className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
-                  title="Delete Case"
-                  aria-label="Delete case"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleStartEdit(c)}
+                    className="p-2 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors"
+                    title="Edit Case"
+                    aria-label="Edit case"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Are you sure you want to delete "${c.diagnosis}"?`)) {
+                        onDeleteCase(c.id);
+                        if (editingCaseId === c.id) handleCancelEdit();
+                      }
+                    }}
+                    className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
+                    title="Delete Case"
+                    aria-label="Delete case"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
