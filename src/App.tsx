@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ActiveView, Modality, MedicalCase } from './types';
 import { MEDICAL_CASES } from './data/casesData';
+import { fetchCases, addCaseToFirestore, deleteCaseFromFirestore } from './services/casesService';
 import { Navbar } from './components/Navbar';
 import { HomeScreen } from './components/HomeScreen';
 import { CarouselView } from './components/CarouselView';
@@ -13,18 +14,15 @@ import { InterpretationView } from './components/InterpretationView';
 export default function App() {
   const [activeView, setActiveView] = useState<ActiveView>('home');
   const [selectedModality, setSelectedModality] = useState<Modality>('chest_xray');
-  const [cases, setCases] = useState<MedicalCase[]>(() => {
-    try {
-      const saved = localStorage.getItem('radcarousel_custom_cases');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return [...MEDICAL_CASES, ...parsed];
+  const [cases, setCases] = useState<MedicalCase[]>(MEDICAL_CASES);
+
+  useEffect(() => {
+    fetchCases().then((fetched) => {
+      if (fetched && fetched.length > 0) {
+        setCases(fetched);
       }
-    } catch {
-      // ignore
-    }
-    return MEDICAL_CASES;
-  });
+    });
+  }, []);
 
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -65,26 +63,23 @@ export default function App() {
     }
   };
 
-  const handleAddCase = (newCase: MedicalCase) => {
-    const updated = [newCase, ...cases];
-    setCases(updated);
-    // Save only custom cases to localStorage
-    const customCases = updated.filter(c => c.id.startsWith('custom-'));
+  const handleAddCase = async (newCase: MedicalCase) => {
     try {
-      localStorage.setItem('radcarousel_custom_cases', JSON.stringify(customCases));
-    } catch {
-      // ignore
+      await addCaseToFirestore(newCase);
+      setCases((prev) => [newCase, ...prev]);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save case to Firebase database.');
     }
   };
 
-  const handleDeleteCase = (id: string) => {
-    const updated = cases.filter(c => c.id !== id);
-    setCases(updated);
-    const customCases = updated.filter(c => c.id.startsWith('custom-'));
+  const handleDeleteCase = async (id: string) => {
     try {
-      localStorage.setItem('radcarousel_custom_cases', JSON.stringify(customCases));
-    } catch {
-      // ignore
+      await deleteCaseFromFirestore(id);
+      setCases((prev) => prev.filter((c) => c.id !== id));
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete case from Firebase database.');
     }
   };
 

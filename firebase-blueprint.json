@@ -1,0 +1,28 @@
+{
+  "entities": {
+    "MedicalCase": {
+      "title": "MedicalCase",
+      "description": "Radiology teaching case with image and clinical details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "modality": { "type": "string" },
+        "category": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "imageAlt": { "type": "string" },
+        "question": { "type": "string" },
+        "diagnosis": { "type": "string" },
+        "clinicalSignificance": { "type": "string" },
+        "difficulty": { "type": "string" }
+      },
+      "required": ["id", "title", "modality", "category", "imageUrl", "diagnosis"]
+    }
+  },
+  "firestore": {
+    "/cases/{caseId}": {
+      "schema": "MedicalCase",
+      "description": "Radiology teaching cases collection"
+    }
+  }
+}
