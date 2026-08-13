@@ -19,7 +19,8 @@ export default function App() {
   useEffect(() => {
     fetchCases().then((fetched) => {
       if (fetched && fetched.length > 0) {
-        setCases(fetched);
+        const unique = Array.from(new Map(fetched.map(c => [c.id, c])).values());
+        setCases(unique);
       }
     });
   }, []);
@@ -66,7 +67,10 @@ export default function App() {
   const handleAddCase = async (newCase: MedicalCase) => {
     try {
       await addCaseToFirestore(newCase);
-      setCases((prev) => [newCase, ...prev]);
+      setCases((prev) => {
+        const filtered = prev.filter(c => c.id !== newCase.id);
+        return [newCase, ...filtered];
+      });
     } catch (err) {
       console.error(err);
       alert('Failed to save case to Firebase database.');

@@ -8,17 +8,23 @@ const COLLECTION_NAME = 'cases';
 export async function fetchCases(): Promise<MedicalCase[]> {
   try {
     const querySnapshot = await getDocs(collection(db, COLLECTION_NAME));
-    const cases: MedicalCase[] = [];
+    const casesMap = new Map<string, MedicalCase>();
     querySnapshot.forEach((docSnap) => {
-      cases.push(docSnap.data() as MedicalCase);
+      const data = docSnap.data() as MedicalCase;
+      if (data && data.id) {
+        casesMap.set(data.id, data);
+      }
     });
+
+    let cases = Array.from(casesMap.values());
 
     // If no cases in Firestore yet, seed initial MEDICAL_CASES
     if (cases.length === 0) {
       for (const c of MEDICAL_CASES) {
         await setDoc(doc(db, COLLECTION_NAME, c.id), c);
-        cases.push(c);
+        casesMap.set(c.id, c);
       }
+      cases = Array.from(casesMap.values());
     }
     return cases;
   } catch (error) {
