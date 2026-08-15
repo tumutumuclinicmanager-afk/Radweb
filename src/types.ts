@@ -21,4 +21,4 @@ export interface MedicalCase {
   galleryImages?: { url: string; caption: string }[];
 }
 
-export type ActiveView = 'home' | 'carousel' | 'flashcards' | 'disclaimer' | 'quiz' | 'admin' | 'interpretation';
+export type ActiveView = 'home' | 'cases' | 'flashcards' | 'disclaimer' | 'quiz' | 'admin' | 'interpretation';

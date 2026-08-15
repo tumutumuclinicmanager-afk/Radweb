@@ -124,7 +124,7 @@ export default function App() {
               />
             )}
 
-            {activeView === 'carousel' && (
+            {activeView === 'cases' && (
               <CarouselView
                 cases={cases}
                 selectedModality={selectedModality}
@@ -160,7 +160,7 @@ export default function App() {
 
             {activeView === 'interpretation' && (
               <InterpretationView
-                onBackToCarousel={() => setActiveView('carousel')}
+                onBackToCarousel={() => setActiveView('cases')}
                 onBackToHome={() => setActiveView('home')}
               />
             )}

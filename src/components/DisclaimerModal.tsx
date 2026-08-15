@@ -42,7 +42,7 @@ export const DisclaimerModal: React.FC<DisclaimerModalProps> = ({ onClose }) => 
               <BookOpen className="w-5 h-5 text-blue-600" /> Educational Purpose & Target Audience
             </h2>
             <p className="leading-relaxed">
-              RadCarousel is designed as a high-yield learning and recall tool for medical students, clinical interns, emergency medicine residents, ICU fellows, and practicing clinicians. By presenting curated radiographic and cross-sectional brain CT cases paired with structured reporting templates and teaching pearls, learners build rapid diagnostic pattern recognition.
+              RadMed is designed as a high-yield learning and recall tool for medical students, clinical interns, emergency medicine residents, ICU fellows, and practicing clinicians. By presenting curated radiographic and cross-sectional brain CT cases paired with structured reporting templates and teaching pearls, learners build rapid diagnostic pattern recognition.
             </p>
           </div>
 
@@ -50,7 +50,7 @@ export const DisclaimerModal: React.FC<DisclaimerModalProps> = ({ onClose }) => 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
               <h3 className="font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Carousel Learning Mode
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Case Gallery Learning Mode
               </h3>
               <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                 Swipe through high-resolution medical imaging cases categorized by normal variants, common pathology, and emergency life-threatening findings. Tap any case to examine key findings, clinical significance, and reporting language.

@@ -161,10 +161,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </div>
 
-      {/* Main Website Carousels & Sections - CASES FIRST */}
+      {/* Main Case Sections */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 relative z-20 space-y-12">
         
-        {/* --- SECTION 1: CHEST X-RAY CAROUSEL --- */}
+        {/* --- SECTION 1: CHEST X-RAY CASES --- */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -173,7 +173,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                  Chest X-ray Carousel Library
+                  Chest X-ray Case Library
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   PA & Lateral radiographs: Normal variants, lobar pneumonia, pneumothorax, and CHF
@@ -185,7 +185,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <button
                 onClick={() => {
                   setSelectedModality('chest_xray');
-                  setActiveView('carousel');
+                  setActiveView('cases');
                 }}
                 className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 mr-2"
               >
@@ -208,7 +208,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
           </div>
 
-          {/* Horizontal Carousel Track */}
+          {/* Horizontal Case Track */}
           <div 
             ref={cxrCarouselRef}
             className="flex gap-6 overflow-x-auto pb-4 pt-2 px-1 scrollbar-none snap-x snap-mandatory"
@@ -268,7 +268,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
         </div>
 
-        {/* --- SECTION 2: HEAD CT CAROUSEL --- */}
+        {/* --- SECTION 2: HEAD CT CASES --- */}
         <div className="space-y-4 pt-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -277,7 +277,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                  Head CT Carousel Library
+                  Head CT Case Library
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Non-contrast brain CT: Epidural & subdural hematomas, SAH, MCA infarcts, and skull fractures
@@ -289,7 +289,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <button
                 onClick={() => {
                   setSelectedModality('head_ct');
-                  setActiveView('carousel');
+                  setActiveView('cases');
                 }}
                 className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 mr-2"
               >
@@ -312,7 +312,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
           </div>
 
-          {/* Horizontal Carousel Track */}
+          {/* Horizontal Case Track */}
           <div 
             ref={ctCarouselRef}
             className="flex gap-6 overflow-x-auto pb-6 pt-2 px-1 scrollbar-none snap-x snap-mandatory"

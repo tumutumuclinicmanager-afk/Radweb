@@ -59,7 +59,7 @@ export const InterpretationView: React.FC<InterpretationViewProps> = ({
               onClick={onBackToCarousel}
               className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold text-sm shadow-lg transition-all flex items-center gap-2"
             >
-              <BookOpen className="w-4 h-4" /> Practice Cases in Carousel <ArrowRight className="w-4 h-4" />
+              <BookOpen className="w-4 h-4" /> Practice Cases <ArrowRight className="w-4 h-4" />
             </button>
             <button
               onClick={onBackToHome}

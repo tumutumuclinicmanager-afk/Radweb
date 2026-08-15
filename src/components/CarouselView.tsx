@@ -74,7 +74,7 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-md bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-              Interactive Carousel
+              Interactive Case Gallery
             </span>
             <span className="text-xs text-slate-500 dark:text-slate-400">
               {filteredCases.length} Cases Available
