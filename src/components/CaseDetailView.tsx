@@ -258,11 +258,11 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                       setZoomLevel(1);
                       setLightboxOpen(true);
                     }}
-                    className="absolute top-3 right-3 bg-slate-900/80 hover:bg-slate-900 text-white p-2.5 rounded-xl shadow-lg backdrop-blur-sm transition-all flex items-center gap-1.5 text-xs font-semibold z-10"
+                    className="absolute top-3 left-3 bg-slate-900/80 hover:bg-slate-900 text-white p-2.5 rounded-xl shadow-lg backdrop-blur-sm transition-all flex items-center gap-1.5 text-xs font-semibold z-10"
                     title="Click to Zoom & Inspect Finer Details"
                   >
                     <ZoomIn className="w-4 h-4 text-blue-400" />
-                    <span>Zoom Image</span>
+                    <span>Zoom</span>
                   </button>
 
                   <div className="absolute bottom-3 left-3 right-3 text-white">

@@ -49,11 +49,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Navigation Actions */}
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-1 sm:gap-3">
           {activeView !== 'home' && (
             <button
               onClick={() => setActiveView('home')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title="Home"
             >
               <Home className="w-4 h-4" />
               <span className="hidden md:inline">Home</span>
@@ -61,23 +62,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
 
           <button
-            onClick={() => {
-              setSelectedModality('chest_xray');
-              setActiveView('carousel');
-            }}
-            className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              activeView === 'carousel'
-                ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300'
-                : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <BookOpen className="w-4 h-4" />
-            Library
-          </button>
-
-          <button
             onClick={() => setActiveView('interpretation')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
               activeView === 'interpretation'
                 ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300'
                 : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -85,25 +71,26 @@ export const Navbar: React.FC<NavbarProps> = ({
             title="Chest X-ray Interpretation Guide"
           >
             <BookOpen className="w-4 h-4" />
-            <span className="hidden sm:inline">CXR Guide</span>
+            <span className="hidden md:inline">CXR Guide</span>
           </button>
 
           <button
             onClick={() => setActiveView('flashcards')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
               activeView === 'flashcards'
                 ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300'
                 : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
             }`}
+            title="Flashcards"
           >
             <Layers className="w-4 h-4" />
-            <span className="hidden sm:inline">Flashcards</span>
+            <span className="hidden md:inline">Flashcards</span>
           </button>
 
           {/* Admin Login Button */}
           <button
             onClick={() => setActiveView('admin')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
               activeView === 'admin'
                 ? 'bg-blue-600 text-white'
                 : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -111,7 +98,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             title="Admin Login & Case Upload"
           >
             <Lock className="w-4 h-4" />
-            <span className="hidden sm:inline">Admin</span>
+            <span className="hidden md:inline">Admin</span>
           </button>
 
           <button
