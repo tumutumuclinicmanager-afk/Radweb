@@ -224,6 +224,7 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                   <img 
                     src={selectedImgUrl} 
                     alt={selectedCaption}
+                    onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80'; }}
                     className="w-full h-80 sm:h-[420px] object-cover transition-all duration-300 cursor-zoom-in"
                     onClick={() => {
                       setZoomLevel(1);
@@ -561,10 +562,7 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
             <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10 bg-slate-900/80 backdrop-blur-md px-6 py-3 rounded-2xl border border-slate-800 text-white">
               <div className="flex items-center gap-3">
                 <Maximize2 className="w-5 h-5 text-blue-400" />
-                <div>
-                  <h4 className="text-sm font-bold truncate max-w-md">{selectedCaption}</h4>
-                  <p className="text-[10px] text-slate-400">High-Resolution Radiograph / CT Zoom Viewer (Zoom: {Math.round(zoomLevel * 100)}%)</p>
-                </div>
+                <span className="text-xs font-semibold text-slate-300">High-Resolution Radiograph / CT Zoom Viewer (Zoom: {Math.round(zoomLevel * 100)}%)</span>
               </div>
 
               <div className="flex items-center gap-2">
@@ -619,32 +617,46 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                 }
                 handleTouchEnd();
               }}
-              className="relative overflow-auto max-h-[80vh] max-w-full rounded-2xl border border-slate-800 bg-slate-950 p-2 mt-16 flex items-center justify-center touch-none select-none group"
+              className="relative overflow-auto max-h-[75vh] max-w-full rounded-2xl border border-slate-800 bg-slate-950 p-2 mt-16 flex items-center justify-center touch-none select-none group"
             >
               <img
                 src={selectedImgUrl}
                 alt={selectedCaption}
+                onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80'; }}
                 style={{ transform: `scale(${zoomLevel})`, transition: initialPinchDist ? 'none' : 'transform 0.15s ease-out' }}
-                className="max-h-[75vh] object-contain cursor-grab active:cursor-grabbing origin-center"
+                className="max-h-[68vh] object-contain cursor-grab active:cursor-grabbing origin-center"
               />
 
               {galleryImages.length > 1 && (
                 <>
                   <button
                     onClick={(e) => { e.stopPropagation(); handlePrevGalleryImage(); }}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-slate-900/90 hover:bg-slate-800 text-white p-3 rounded-full shadow-xl transition-all"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-slate-900/90 hover:bg-slate-800 text-white p-3 rounded-full shadow-xl transition-all z-10"
                     title="Previous Gallery Image"
                   >
                     <ChevronLeft className="w-6 h-6" />
                   </button>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleNextGalleryImage(); }}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-slate-900/90 hover:bg-slate-800 text-white p-3 rounded-full shadow-xl transition-all"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-slate-900/90 hover:bg-slate-800 text-white p-3 rounded-full shadow-xl transition-all z-10"
                     title="Next Gallery Image"
                   >
                     <ChevronRight className="w-6 h-6" />
                   </button>
                 </>
+              )}
+            </div>
+
+            {/* Bottom Caption / Diagnosis Banner */}
+            <div className="w-full mt-3 bg-slate-900/90 backdrop-blur-md px-6 py-3 rounded-2xl border border-slate-800 text-white flex items-center justify-between shadow-xl">
+              <div>
+                <span className="text-[10px] text-blue-400 font-semibold uppercase tracking-wider block">Case Diagnosis & Image Caption</span>
+                <h4 className="text-sm font-bold text-slate-100">{selectedCaption} ({currentCase.title})</h4>
+              </div>
+              {galleryImages.length > 1 && (
+                <div className="text-xs text-slate-400 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
+                  Gallery View {galleryImages.findIndex(i => i.url === selectedImgUrl) + 1} of {galleryImages.length}
+                </div>
               )}
             </div>
 

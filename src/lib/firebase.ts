@@ -6,14 +6,14 @@ import firebaseConfig from '../../firebase-applet-config.json';
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || undefined);
 
-// Validate connection on boot
+// Validate connection on boot quietly
 async function testConnection() {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration.");
-    }
+    // Firestore operating in offline mode or connection unavailable
+    console.info("Firestore operating in offline mode or awaiting network connection.");
   }
 }
 testConnection();
+

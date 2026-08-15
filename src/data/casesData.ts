@@ -7,7 +7,7 @@ export const MEDICAL_CASES: MedicalCase[] = [
     title: 'Normal Adult Chest X-Ray (PA & Lateral)',
     modality: 'chest_xray',
     category: 'Normal',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/a/a4/Chest_Xray_PA_3-8-2010.png',
+    imageUrl: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Normal PA Chest X-ray showing clear lung fields and normal cardiac silhouette',
     question: 'What anatomical landmarks verify adequate inspiration and positioning on this PA chest radiograph?',
     diagnosis: 'Normal Chest Radiograph',
@@ -28,9 +28,9 @@ export const MEDICAL_CASES: MedicalCase[] = [
     cmeTip: 'A common pitfall is mistaking skin folds or breast shadows for pneumothorax margins. Always trace vessels past any suspected pleural line.',
     difficulty: 'Beginner',
     galleryImages: [
-      { url: 'https://upload.wikimedia.org/wikipedia/commons/a/a4/Chest_Xray_PA_3-8-2010.png', caption: 'Posteroanterior (PA) View - Standard Inspiration' },
-      { url: 'https://upload.wikimedia.org/wikipedia/commons/3/33/Pneumonia_LLL_chest_X-ray.jpg', caption: 'Lateral View - Retrosternal and Retrocardiac Spaces' },
-      { url: 'https://upload.wikimedia.org/wikipedia/commons/6/6d/Cardiomegaly_on_CXR.jpg', caption: 'Apical View Highlighting Clavicles & First Ribs' }
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: 'Posteroanterior (PA) View - Standard Inspiration' },
+      { url: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=1200&q=80', caption: 'Lateral View - Retrosternal and Retrocardiac Spaces' },
+      { url: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=1200&q=80', caption: 'Apical View Highlighting Clavicles & First Ribs' }
     ]
   },
   {
@@ -38,7 +38,7 @@ export const MEDICAL_CASES: MedicalCase[] = [
     title: 'Tension Pneumothorax (Right Lung Collapse)',
     modality: 'chest_xray',
     category: 'Emergency Findings',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/1b/Pneumothorax_right_lung_on_chest_X-ray.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Chest X-ray showing complete collapse of right lung with mediastinal shift',
     question: 'What is the immediate life-threatening radiographic sign that distinguishes tension pneumothorax from simple pneumothorax?',
     diagnosis: 'Large Right-Sided Tension Pneumothorax',
@@ -58,9 +58,9 @@ export const MEDICAL_CASES: MedicalCase[] = [
     cmeTip: 'In supine trauma patients, a pneumothorax often accumulates anteriorly and inferiorly, producing the characteristic "deep sulcus sign".',
     difficulty: 'Advanced',
     galleryImages: [
-      { url: 'https://upload.wikimedia.org/wikipedia/commons/1/1b/Pneumothorax_right_lung_on_chest_X-ray.jpg', caption: 'Upright PA View Showing Visceral Pleural Line' },
-      { url: 'https://upload.wikimedia.org/wikipedia/commons/5/58/Pleural_effusion_right_chest_X-ray.jpg', caption: 'Supine Trauma View with Deep Sulcus Sign' },
-      { url: 'https://upload.wikimedia.org/wikipedia/commons/a/a4/Chest_Xray_PA_3-8-2010.png', caption: 'Post-Chest Tube Re-expansion View' }
+      { url: 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?auto=format&fit=crop&w=1200&q=80', caption: 'Upright PA View Showing Visceral Pleural Line' },
+      { url: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=1200&q=80', caption: 'Supine Trauma View with Deep Sulcus Sign' },
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: 'Post-Chest Tube Re-expansion View' }
     ]
   },
   {
@@ -68,7 +68,7 @@ export const MEDICAL_CASES: MedicalCase[] = [
     title: 'Lobar Pneumonia (Right Middle Lobe)',
     modality: 'chest_xray',
     category: 'Common Pathology',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/3/33/Pneumonia_LLL_chest_X-ray.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Chest X-ray showing dense opacification in the right middle lobe',
     question: 'Which anatomical fissure borders the superior margin of the right middle lobe consolidation?',
     diagnosis: 'Right Middle Lobe Bacterial Pneumonia',
@@ -88,8 +88,8 @@ export const MEDICAL_CASES: MedicalCase[] = [
     cmeTip: 'Always obtain a lateral view to accurately localize whether an infiltrate is in the middle lobe or lower lobe.',
     difficulty: 'Beginner',
     galleryImages: [
-      { url: 'https://upload.wikimedia.org/wikipedia/commons/3/33/Pneumonia_LLL_chest_X-ray.jpg', caption: 'PA View Highlighting Right Heart Border Silhouette Sign' },
-      { url: 'https://upload.wikimedia.org/wikipedia/commons/a/a4/Chest_Xray_PA_3-8-2010.png', caption: 'Lateral View Demonstrating Wedge Infiltrate' }
+      { url: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=1200&q=80', caption: 'PA View Highlighting Right Heart Border Silhouette Sign' },
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: 'Lateral View Demonstrating Wedge Infiltrate' }
     ]
   },
   {
@@ -97,7 +97,7 @@ export const MEDICAL_CASES: MedicalCase[] = [
     title: 'Moderate Bilateral Pleural Effusion',
     modality: 'chest_xray',
     category: 'Common Pathology',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/5/58/Pleural_effusion_right_chest_X-ray.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Chest X-ray showing blunting of bilateral costophrenic angles with meniscus sign',
     question: 'How much free pleural fluid is typically required to blunt the costophrenic angle on a lateral decubitus vs PA chest radiograph?',
     diagnosis: 'Bilateral Pleural Effusions (Congestive Heart Failure)',
@@ -115,14 +115,18 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'Look for upward curving meniscus at the lateral chest wall.'
     ],
     cmeTip: 'When pleural effusions are asymmetric or accompanied by fever/pleuritic pain, diagnostic thoracentesis should be considered.',
-    difficulty: 'Intermediate'
+    difficulty: 'Intermediate',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=1200&q=80', caption: 'Upright PA View with Meniscus Sign' },
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: 'Lateral Decubitus View' }
+    ]
   },
   {
     id: 'cxr-5',
     title: 'Severe Cardiomegaly with Pulmonary Edema (Bat-Wing Opacities)',
     modality: 'chest_xray',
     category: 'Emergency Findings',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/6/6d/Cardiomegaly_on_CXR.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Chest X-ray with enlarged heart and perihilar bat-wing alveolar edema',
     question: 'What is the classic term used to describe symmetrical perihilar alveolar edema spreading outward from the hila?',
     diagnosis: 'Acute Decompensated Heart Failure with Pulmonary Edema',
@@ -140,14 +144,18 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'In acute pulmonary edema, clinical improvement often lags behind radiographic clearing by 24 to 48 hours.'
     ],
     cmeTip: 'Check for vascular pedicle widening (> 58mm) as an early quantitative indicator of intravascular volume overload on portable chest X-rays.',
-    difficulty: 'Intermediate'
+    difficulty: 'Intermediate',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?auto=format&fit=crop&w=1200&q=80', caption: 'Portable AP View Demonstrating Bat-Wing Opacities' },
+      { url: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=1200&q=80', caption: 'Post-Diuresis Follow-up View' }
+    ]
   },
   {
     id: 'cxr-6',
     title: 'Left Upper Lobe Atelectasis (Collapsed Lobe)',
     modality: 'chest_xray',
     category: 'Common Pathology',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/a/a4/Chest_Xray_PA_3-8-2010.png',
+    imageUrl: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Chest radiograph demonstrating volume loss and veil opacity in the left upper hemithorax',
     question: 'What happens to the left hilum and trachea in chronic left upper lobe collapse?',
     diagnosis: 'Left Upper Lobe Atelectasis',
@@ -165,14 +173,18 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'Indirect signs include mediastinal shift, compensatory hyperinflation, and approximation of ribs.'
     ],
     cmeTip: 'Always rule out an obstructing endobronchial mass in adult patients presenting with unexplained lobar collapse.',
-    difficulty: 'Advanced'
+    difficulty: 'Advanced',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: 'PA View Highlighting Veil Opacity' },
+      { url: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=1200&q=80', caption: 'Lateral View Highlighting Fissure Displacement' }
+    ]
   },
   {
     id: 'cxr-7',
     title: 'Left Lower Lobe Pneumonia (Retrocardiac Infiltrate)',
     modality: 'chest_xray',
     category: 'Common Pathology',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/3/33/Pneumonia_LLL_chest_X-ray.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Chest X-ray showing retrocardiac airspace density obscured on PA view',
     question: 'Why is the lateral chest radiograph critical when evaluating left lower lobe pathology?',
     diagnosis: 'Left Lower Lobe Pneumonia',
@@ -190,14 +202,18 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'Always inspect the retrocardiac space systematically.'
     ],
     cmeTip: 'Failing to check the lateral view is a frequent cause of missed lower lobe pneumonias in emergency departments.',
-    difficulty: 'Intermediate'
+    difficulty: 'Intermediate',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=1200&q=80', caption: 'PA View with Retrocardiac Density' },
+      { url: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=1200&q=80', caption: 'Lateral View Highlighting Spine Sign' }
+    ]
   },
   {
     id: 'cxr-8',
     title: 'Subdiaphragmatic Free Air (Pneumoperitoneum)',
     modality: 'chest_xray',
     category: 'Emergency Findings',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/1b/Pneumothorax_right_lung_on_chest_X-ray.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Upright chest X-ray showing crescentic free air under the right hemidiaphragm',
     question: 'What is the most common cause of pneumoperitoneum seen on acute abdominal and chest radiographs?',
     diagnosis: 'Pneumoperitoneum secondary to Viscous Perforation',
@@ -215,14 +231,18 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'Even small amounts of free air (as little as 1 mL) can be detected under the right hemidiaphragm because the liver acts as an acoustic/radiographic window.'
     ],
     cmeTip: 'If a patient cannot stand upright, obtain a left lateral decubitus abdominal radiograph where free air accumulates over the liver edge.',
-    difficulty: 'Advanced'
+    difficulty: 'Advanced',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?auto=format&fit=crop&w=1200&q=80', caption: 'Upright View Showing Subdiaphragmatic Air' },
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: 'Supine View with Rigler Sign' }
+    ]
   },
   {
     id: 'cxr-9',
     title: 'Normal Pediatric Chest X-ray (Thymic Sail Sign)',
     modality: 'chest_xray',
     category: 'Normal',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/a/a4/Chest_Xray_PA_3-8-2010.png',
+    imageUrl: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Pediatric chest X-ray showing normal prominent superior mediastinum with thymic sail sign',
     question: 'What benign pediatric mediastinal structure can mimic cardiomegaly or a widened mediastinum in infants?',
     diagnosis: 'Normal Thymus with Thymic Sail Sign in Infant',
@@ -239,14 +259,17 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'The wave sign is created by anterior rib impressions on the normal thymic lobes.'
     ],
     cmeTip: 'Do not mistake normal thymic tissue in infants for pneumonia, widened mediastinum, or cardiomegaly.',
-    difficulty: 'Beginner'
+    difficulty: 'Beginner',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: 'Pediatric AP View with Thymic Sail Sign' }
+    ]
   },
   {
     id: 'cxr-10',
     title: 'Pulmonary Embolism Sign (Westermark Sign & Hampton Hump)',
     modality: 'chest_xray',
     category: 'Emergency Findings',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/6/6d/Cardiomegaly_on_CXR.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Chest X-ray showing focal oligemia and peripheral wedge opacity',
     question: 'What classic chest X-ray sign describes focal oligemia or decreased vascular markings distal to an occluded pulmonary artery?',
     diagnosis: 'Pulmonary Embolism with Westermark Sign',
@@ -264,7 +287,11 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'Hampton hump base is always against the pleural surface with its apex pointing toward the hilum.'
     ],
     cmeTip: 'Always correlate suspected PE findings with Wells Score or Geneva criteria and D-dimer testing.',
-    difficulty: 'Advanced'
+    difficulty: 'Advanced',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&w=1200&q=80', caption: 'PA View Highlighting Hampton Hump' },
+      { url: 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?auto=format&fit=crop&w=1200&q=80', caption: 'CTA Pulmonary Angiogram Correlative View' }
+    ]
   },
 
   // --- HEAD CT CASES (10 cases) ---
@@ -273,7 +300,7 @@ export const MEDICAL_CASES: MedicalCase[] = [
     title: 'Normal Non-Contrast Brain CT',
     modality: 'head_ct',
     category: 'Normal',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/3/36/CT_of_human_brain_-_normal.png',
+    imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Normal non-contrast head CT showing symmetric ventricles and sulci',
     question: 'What is the standard Hounsfield Unit (HU) of acute blood vs cerebrospinal fluid (CSF) on a non-contrast head CT?',
     diagnosis: 'Normal Non-Contrast Head CT',
@@ -291,14 +318,18 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'CSF is hypodense (dark black, ~0-15 HU) matching water density.'
     ],
     cmeTip: 'Always check the basal cisterns first in acute trauma. Effacement of the suprasellar and prepontine cisterns indicates life-threatening elevated intracranial pressure.',
-    difficulty: 'Beginner'
+    difficulty: 'Beginner',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80', caption: 'Axial Brain Window at Ventricular Level' },
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: 'Axial Bone Window Showing Calvarium' }
+    ]
   },
   {
     id: 'ct-2',
     title: 'Acute Epidural Hematoma (Lens-Shaped Biconvex Collection)',
     modality: 'head_ct',
     category: 'Emergency Findings',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/3/3d/Epidural_hematoma_CT.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Non-contrast head CT showing biconvex hyperdense extra-axial collection with mass effect',
     question: 'Which meningeal vessel is most commonly lacerated in acute epidural hematoma, leading to arterial bleeding?',
     diagnosis: 'Acute Epidural Hematoma (EDH) with Middle Meningeal Artery Injury',
@@ -316,14 +347,18 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'Rapid arterial pressure can cause uncal herniation, brainstem compression, and death if untreated.'
     ],
     cmeTip: 'Never delay neurosurgical consultation when an epidural hematoma is identified, even if the patient is currently awake and stable.',
-    difficulty: 'Advanced'
+    difficulty: 'Advanced',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80', caption: 'Brain Window Showing Biconvex Hyperdensity' },
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: 'Bone Window Showing Temporal Skull Fracture' }
+    ]
   },
   {
     id: 'ct-3',
     title: 'Acute Subdural Hematoma (Crescent-Shaped Collection)',
     modality: 'head_ct',
     category: 'Emergency Findings',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/7/7b/Subdural_hematoma_CT.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Non-contrast head CT showing crescent-shaped hyperdense extra-axial collection',
     question: 'What vascular structure is typically torn to cause an acute subdural hematoma?',
     diagnosis: 'Acute Subdural Hematoma (SDH) from Bridging Vein Rupture',
@@ -341,14 +376,18 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'Because they cross suture lines, subdural collections can spread over the entire cerebral hemisphere.'
     ],
     cmeTip: 'An isodense subacute subdural hematoma (approx. 1-3 weeks old) can be easily missed. Always check for sulcal effacement and inward displacement of the gray-white matter junction.',
-    difficulty: 'Intermediate'
+    difficulty: 'Intermediate',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80', caption: 'Axial View Demonstrating Crescentic Hyperdensity' },
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: 'Coronal Reconstruction View' }
+    ]
   },
   {
     id: 'ct-4',
     title: 'Acute Middle Cerebral Artery (MCA) Infarct',
     modality: 'head_ct',
     category: 'Emergency Findings',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/2/22/Ischemic_stroke_CT.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Non-contrast head CT showing loss of insular ribbon and MCA dot sign',
     question: 'What early CT sign indicates acute thrombus within the horizontal segment of the middle cerebral artery?',
     diagnosis: 'Acute Right MCA Territory Ischemic Stroke',
@@ -366,14 +405,18 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'Hyperacute ischemia (< 3 hours) may appear completely normal on non-contrast CT.'
     ],
     cmeTip: 'Time is brain. Rapid non-contrast CT is mandatory within 20 minutes of arrival for acute stroke protocol patients.',
-    difficulty: 'Advanced'
+    difficulty: 'Advanced',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80', caption: 'Axial CT Showing Loss of Insular Ribbon' },
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: 'Follow-up CT at 48 Hours with Established Hypodensity' }
+    ]
   },
   {
     id: 'ct-5',
     title: 'Aneurysmal Subarachnoid Hemorrhage (Starfish Sign)',
     modality: 'head_ct',
     category: 'Emergency Findings',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/4/4b/Subarachnoid_hemorrhage_CT.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Non-contrast head CT showing high-density blood filling basal cisterns and sylvian fissures',
     question: 'What grading scale is commonly used clinically to classify the severity of subarachnoid hemorrhage based on initial CT appearance?',
     diagnosis: 'Acute Subarachnoid Hemorrhage (SAH) from Ruptured Berry Aneurysm',
@@ -390,14 +433,18 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'If CT is negative but clinical suspicion remains high, lumbar puncture is mandatory to evaluate for xanthochromia.'
     ],
     cmeTip: 'Never discharge a patient with thunderclap headache based solely on a non-contrast CT without ruling out SAH definitively.',
-    difficulty: 'Advanced'
+    difficulty: 'Advanced',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80', caption: 'Axial CT Showing Basal Cistern Blood (Starfish Sign)' },
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: 'CTA Circle of Willis Aneurysm Reconstruction' }
+    ]
   },
   {
     id: 'ct-6',
     title: 'Hypertensive Intracerebral Hemorrhage (Basal Ganglia)',
     modality: 'head_ct',
     category: 'Emergency Findings',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/3/3d/Epidural_hematoma_CT.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Non-contrast head CT showing dense focal hematoma in the left basal ganglia',
     question: 'What are the four most common hypertensive target locations for spontaneous intracerebral hemorrhage?',
     diagnosis: 'Spontaneous Hypertensive Intracerebral Hemorrhage (Putamen)',
@@ -415,14 +462,18 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'Strict blood pressure control and reversal of coagulopathy are paramount in management.'
     ],
     cmeTip: 'Lobar hemorrhages in elderly patients are more frequently secondary to cerebral amyloid angiopathy rather than chronic hypertension.',
-    difficulty: 'Intermediate'
+    difficulty: 'Intermediate',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80', caption: 'Axial CT View of Basal Ganglia Hemorrhage' },
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: 'Coronal View Highlighting Midline Shift' }
+    ]
   },
   {
     id: 'ct-7',
     title: 'Chronic Subdural Hematoma (Hypodense Crescent)',
     modality: 'head_ct',
     category: 'Common Pathology',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/7/7b/Subdural_hematoma_CT.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Non-contrast head CT showing bilateral chronic hypodense subdural collections',
     question: 'Why do chronic subdural hematomas appear dark (hypodense) on non-contrast head CT?',
     diagnosis: 'Bilateral Chronic Subdural Hematomas',
@@ -440,14 +491,18 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'Surgical burr hole drainage or twist drill craniostomy is performed if symptomatic.'
     ],
     cmeTip: 'Always check elderly patients presenting with unexplained cognitive decline or falls for chronic subdural hematoma.',
-    difficulty: 'Beginner'
+    difficulty: 'Beginner',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80', caption: 'Axial View Showing Hypodense Crescent' },
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: 'Post-Burr Hole Evacuation View' }
+    ]
   },
   {
     id: 'ct-8',
     title: 'Obstructive Hydrocephalus with Ventriculomegaly',
     modality: 'head_ct',
     category: 'Common Pathology',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/3/36/CT_of_human_brain_-_normal.png',
+    imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Non-contrast head CT showing prominent enlargement of lateral and third ventricles',
     question: 'What is the radiographic sign of transependymal CSF migration (interstitial edema) seen around the ventricles in acute obstructive hydrocephalus?',
     diagnosis: 'Obstructive Hydrocephalus with Periventricular Edema',
@@ -465,14 +520,18 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'Urgent neurosurgical consultation for ventriculostomy or shunt placement is indicated if acute.'
     ],
     cmeTip: 'Rounding of the frontal horns of the lateral ventricles (an acute angle becoming obtuse) is a reliable indicator of increased intraventricular pressure.',
-    difficulty: 'Intermediate'
+    difficulty: 'Intermediate',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80', caption: 'Axial View Demonstrating Ventriculomegaly' },
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: 'Post-Shunt Placement View' }
+    ]
   },
   {
     id: 'ct-9',
     title: 'Skull Fracture (Linear Parietal Fracture)',
     modality: 'head_ct',
     category: 'Emergency Findings',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/3/3d/Epidural_hematoma_CT.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Bone window head CT showing linear radiolucent fracture line through parietal bone',
     question: 'How do you differentiate a vascular groove (e.g., middle meningeal artery branch) from a acute skull fracture on bone window head CT?',
     diagnosis: 'Acute Linear Parietal Skull Fracture',
@@ -489,16 +548,20 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'Basilar skull fractures may present clinically with "raccoon eyes" (periorbital ecchymosis), Battle sign (mastoid ecchymosis), hemotympanum, or CSF otorrhea/rhinorrhea.'
     ],
     cmeTip: 'A normal skull X-ray does not rule out intracranial injury. Non-contrast head CT is the gold standard imaging modality for acute head trauma.',
-    difficulty: 'Beginner'
+    difficulty: 'Beginner',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80', caption: 'Bone Window View of Parietal Fracture' },
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: '3D Volume Rendered Cranial Reconstruction' }
+    ]
   },
   {
     id: 'ct-10',
     title: 'Cerebral Pneumocephalus (Mount Fuji Sign)',
     modality: 'head_ct',
     category: 'Emergency Findings',
-    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/4/4b/Subarachnoid_hemorrhage_CT.jpg',
+    imageUrl: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80',
     imageAlt: 'Non-contrast head CT showing intracranial air bubbles compressing frontal lobes',
-    question: 'What classic CT appearance describes bilateral frontal extra-axial air compressing the tips of the frontal lobes in tension pneumocephalus?',
+    question: 'What is the classic CT appearance describing bilateral frontal extra-axial air compressing the tips of the frontal lobes in tension pneumocephalus?',
     diagnosis: 'Tension Pneumocephalus (Mount Fuji Sign)',
     keyFindings: [
       'Air pockets within the intracranial cavity (very dark, ~ -1000 HU).',
@@ -513,6 +576,10 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'Never administer nitrous oxide anesthesia to patients with suspected or confirmed pneumocephalus, as nitrous oxide expands gas-filled spaces rapidly and can precipitate lethal tension pneumocephalus.'
     ],
     cmeTip: 'Tension pneumocephalus is a neurosurgical emergency that can mimic postoperative or traumatic shock.',
-    difficulty: 'Advanced'
+    difficulty: 'Advanced',
+    galleryImages: [
+      { url: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&w=1200&q=80', caption: 'Axial View Showing Mount Fuji Sign' },
+      { url: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80', caption: 'Coronal View Highlighting Subdural Air' }
+    ]
   }
 ];

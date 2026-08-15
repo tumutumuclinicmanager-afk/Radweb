@@ -296,6 +296,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <img 
                       src={c.imageUrl} 
                       alt={c.imageAlt}
+                      onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80'; }}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90" 
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
@@ -399,6 +400,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     <img 
                       src={c.imageUrl} 
                       alt={c.imageAlt}
+                      onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80'; }}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90" 
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
