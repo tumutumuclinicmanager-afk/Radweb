@@ -94,6 +94,51 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
     ...(currentCase.galleryImages || [])
   ];
 
+  const handlePrevGalleryImage = () => {
+    const currentIndex = galleryImages.findIndex(img => img.url === selectedImgUrl);
+    const prevIndex = (currentIndex - 1 + galleryImages.length) % galleryImages.length;
+    setSelectedImgUrl(galleryImages[prevIndex].url);
+    setSelectedCaption(galleryImages[prevIndex].caption);
+  };
+
+  const handleNextGalleryImage = () => {
+    const currentIndex = galleryImages.findIndex(img => img.url === selectedImgUrl);
+    const nextIndex = (currentIndex + 1) % galleryImages.length;
+    setSelectedImgUrl(galleryImages[nextIndex].url);
+    setSelectedCaption(galleryImages[nextIndex].caption);
+  };
+
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+
+  const handleMainTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      setTouchStartX(e.touches[0].clientX);
+    } else if (e.touches.length === 2) {
+      handleTouchStart(e);
+    }
+  };
+
+  const handleMainTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      handleTouchMove(e);
+    }
+  };
+
+  const handleMainTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX !== null && e.changedTouches.length === 1 && galleryImages.length > 1) {
+      const diffX = e.changedTouches[0].clientX - touchStartX;
+      if (Math.abs(diffX) > 50) {
+        if (diffX > 0) {
+          handlePrevGalleryImage();
+        } else {
+          handleNextGalleryImage();
+        }
+      }
+      setTouchStartX(null);
+    }
+    handleTouchEnd();
+  };
+
   // Find index in filtered or all cases of same modality
   const sameModalityCases = allCases.filter(c => c.modality === currentCase.modality);
   const currentIndex = sameModalityCases.findIndex(c => c.id === currentCase.id);
@@ -170,7 +215,12 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
               
               {/* Left Column: Image Viewer & Gallery */}
               <div className="lg:col-span-5 flex flex-col gap-4">
-                <div className="relative rounded-2xl overflow-hidden bg-slate-950 shadow-lg border border-slate-200 dark:border-slate-800 group">
+                <div 
+                  onTouchStart={handleMainTouchStart}
+                  onTouchMove={handleMainTouchMove}
+                  onTouchEnd={handleMainTouchEnd}
+                  className="relative rounded-2xl overflow-hidden bg-slate-950 shadow-lg border border-slate-200 dark:border-slate-800 group"
+                >
                   <img 
                     src={selectedImgUrl} 
                     alt={selectedCaption}
@@ -181,6 +231,26 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                     }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent pointer-events-none"></div>
+
+                  {/* Gallery Swipe Prev / Next Buttons */}
+                  {galleryImages.length > 1 && (
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handlePrevGalleryImage(); }}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-900 text-white p-2 rounded-full shadow-lg backdrop-blur-sm transition-all opacity-80 group-hover:opacity-100 z-10"
+                        title="Previous Gallery Image"
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleNextGalleryImage(); }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-900 text-white p-2 rounded-full shadow-lg backdrop-blur-sm transition-all opacity-80 group-hover:opacity-100 z-10"
+                        title="Next Gallery Image"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </>
+                  )}
                   
                   {/* Zoom Action Overlay Button */}
                   <button
@@ -188,7 +258,7 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                       setZoomLevel(1);
                       setLightboxOpen(true);
                     }}
-                    className="absolute top-3 right-3 bg-slate-900/80 hover:bg-slate-900 text-white p-2.5 rounded-xl shadow-lg backdrop-blur-sm transition-all flex items-center gap-1.5 text-xs font-semibold"
+                    className="absolute top-3 right-3 bg-slate-900/80 hover:bg-slate-900 text-white p-2.5 rounded-xl shadow-lg backdrop-blur-sm transition-all flex items-center gap-1.5 text-xs font-semibold z-10"
                     title="Click to Zoom & Inspect Finer Details"
                   >
                     <ZoomIn className="w-4 h-4 text-blue-400" />
@@ -197,6 +267,9 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
 
                   <div className="absolute bottom-3 left-3 right-3 text-white">
                     <p className="text-xs font-medium opacity-90">{selectedCaption}</p>
+                    {galleryImages.length > 1 && (
+                      <p className="text-[10px] text-blue-400 mt-0.5">Swipe left/right or use arrows to view gallery photos ({galleryImages.findIndex(i => i.url === selectedImgUrl) + 1} of {galleryImages.length})</p>
+                    )}
                   </div>
                 </div>
 
@@ -528,10 +601,25 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
             {/* Zoomable Image Container */}
             <div 
               onWheel={handleWheel}
-              onTouchStart={handleTouchStart}
+              onTouchStart={(e) => {
+                if (e.touches.length === 1) {
+                  setTouchStartX(e.touches[0].clientX);
+                }
+                handleTouchStart(e);
+              }}
               onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-              className="relative overflow-auto max-h-[80vh] max-w-full rounded-2xl border border-slate-800 bg-slate-950 p-2 mt-16 flex items-center justify-center touch-none select-none"
+              onTouchEnd={(e) => {
+                if (touchStartX !== null && e.changedTouches.length === 1 && galleryImages.length > 1) {
+                  const diffX = e.changedTouches[0].clientX - touchStartX;
+                  if (Math.abs(diffX) > 50) {
+                    if (diffX > 0) handlePrevGalleryImage();
+                    else handleNextGalleryImage();
+                  }
+                  setTouchStartX(null);
+                }
+                handleTouchEnd();
+              }}
+              className="relative overflow-auto max-h-[80vh] max-w-full rounded-2xl border border-slate-800 bg-slate-950 p-2 mt-16 flex items-center justify-center touch-none select-none group"
             >
               <img
                 src={selectedImgUrl}
@@ -539,6 +627,25 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                 style={{ transform: `scale(${zoomLevel})`, transition: initialPinchDist ? 'none' : 'transform 0.15s ease-out' }}
                 className="max-h-[75vh] object-contain cursor-grab active:cursor-grabbing origin-center"
               />
+
+              {galleryImages.length > 1 && (
+                <>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handlePrevGalleryImage(); }}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-slate-900/90 hover:bg-slate-800 text-white p-3 rounded-full shadow-xl transition-all"
+                    title="Previous Gallery Image"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleNextGalleryImage(); }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-slate-900/90 hover:bg-slate-800 text-white p-3 rounded-full shadow-xl transition-all"
+                    title="Next Gallery Image"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                </>
+              )}
             </div>
 
             <div className="mt-4 text-center text-xs text-slate-400 bg-slate-900/60 px-4 py-2 rounded-xl border border-slate-800">
