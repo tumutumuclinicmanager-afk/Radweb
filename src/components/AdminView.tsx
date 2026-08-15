@@ -15,7 +15,8 @@ import {
   Edit3,
   Upload,
   X,
-  Save
+  Save,
+  Images
 } from 'lucide-react';
 
 interface AdminViewProps {
@@ -56,6 +57,11 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [cmeTip, setCmeTip] = useState('');
   const [difficulty, setDifficulty] = useState<'Beginner' | 'Intermediate' | 'Advanced'>('Intermediate');
   
+  // Gallery photos (additional views without replacing original primary image)
+  const [galleryImages, setGalleryImages] = useState<{ url: string; caption: string }[]>([]);
+  const [newGalleryUrl, setNewGalleryUrl] = useState('');
+  const [newGalleryCaption, setNewGalleryCaption] = useState('');
+  
   const [successMessage, setSuccessMessage] = useState('');
 
   const handleLogin = (e: React.FormEvent) => {
@@ -87,6 +93,36 @@ export const AdminView: React.FC<AdminViewProps> = ({
     }
   };
 
+  const handleGalleryFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setNewGalleryUrl(event.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAddGalleryPhoto = () => {
+    if (!newGalleryUrl) {
+      alert('Please provide an image URL or choose a file for the additional gallery photo.');
+      return;
+    }
+    setGalleryImages(prev => [
+      ...prev,
+      { url: newGalleryUrl, caption: newGalleryCaption || `Additional View ${prev.length + 1}` }
+    ]);
+    setNewGalleryUrl('');
+    setNewGalleryCaption('');
+  };
+
+  const handleRemoveGalleryPhoto = (index: number) => {
+    setGalleryImages(prev => prev.filter((_, idx) => idx !== index));
+  };
+
   const handleStartEdit = (c: MedicalCase) => {
     setEditingCaseId(c.id);
     setTitle(c.title);
@@ -103,6 +139,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
     setTeachingPoints(c.teachingPoints ? c.teachingPoints.join('\n') : '');
     setCmeTip(c.cmeTip || '');
     setDifficulty(c.difficulty);
+    setGalleryImages(c.galleryImages || []);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -119,12 +156,15 @@ export const AdminView: React.FC<AdminViewProps> = ({
     setReportingTemplate('');
     setTeachingPoints('');
     setCmeTip('');
+    setGalleryImages([]);
+    setNewGalleryUrl('');
+    setNewGalleryCaption('');
   };
 
   const handleSubmitCase = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !diagnosis || !imageUrl) {
-      alert('Please fill in at least Title, Diagnosis, and Image (URL or uploaded file).');
+      alert('Please fill in at least Title, Diagnosis, and Primary Image.');
       return;
     }
 
@@ -146,6 +186,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
       teachingPoints: teachingPoints ? teachingPoints.split('\n').filter(Boolean) : ['Correlate clinically with physical examination.'],
       cmeTip: cmeTip || 'Always verify films with clinical history.',
       difficulty,
+      galleryImages: galleryImages.length > 0 ? galleryImages : undefined,
     };
 
     onAddCase(updatedCase);
@@ -410,10 +451,101 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
                   </div>
                   <div className="text-xs text-slate-500 dark:text-slate-400">
-                    <span className="font-bold text-slate-700 dark:text-slate-200">Image Preview Loaded:</span> Ready for publication.
+                    <span className="font-bold text-slate-700 dark:text-slate-200">Primary Image Loaded:</span> Main view for case preview.
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Condition Gallery Photos (Additional Views without replacing original primary image) */}
+            <div className="p-5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                    <Images className="w-4 h-4 text-indigo-600" /> Condition Image Gallery Photos ({galleryImages.length})
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    Add extra radiological angles, projections, or cuts for this condition without replacing the primary image above.
+                  </p>
+                </div>
+              </div>
+
+              {/* Added Gallery Photos List */}
+              {galleryImages.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  {galleryImages.map((img, idx) => (
+                    <div key={idx} className="flex items-center gap-3 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                      <div className="w-14 h-14 rounded-lg overflow-hidden bg-slate-950 flex-shrink-0">
+                        <img src={img.url} alt={img.caption} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{img.caption}</p>
+                        <span className="text-[10px] text-slate-400 font-mono">View #{idx + 1}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveGalleryPhoto(idx)}
+                        className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 hover:bg-rose-100 transition-colors"
+                        title="Remove gallery photo"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add New Gallery Photo Input Box */}
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+                <div className="text-xs font-bold text-slate-700 dark:text-slate-300">Add Gallery Photo (URL or File Upload)</div>
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                  <div className="sm:col-span-6">
+                    <input
+                      type="text"
+                      value={newGalleryUrl}
+                      onChange={(e) => setNewGalleryUrl(e.target.value)}
+                      placeholder="Image URL or uploaded file data"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="sm:col-span-4">
+                    <input
+                      type="text"
+                      value={newGalleryCaption}
+                      onChange={(e) => setNewGalleryCaption(e.target.value)}
+                      placeholder="Caption (e.g., Lateral View)"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="sm:col-span-2 flex items-center gap-2">
+                    <label className="cursor-pointer px-3 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center transition-colors flex-1" title="Upload file">
+                      <Upload className="w-3.5 h-3.5" />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleGalleryFileUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleAddGalleryPhoto}
+                      className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1 shadow-sm transition-colors flex-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add
+                    </button>
+                  </div>
+                </div>
+
+                {newGalleryUrl && (
+                  <div className="flex items-center gap-3 pt-2">
+                    <div className="w-12 h-12 rounded-lg bg-slate-200 dark:bg-slate-700 overflow-hidden flex-shrink-0">
+                      <img src={newGalleryUrl} alt="New Preview" className="w-full h-full object-cover" />
+                    </div>
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">Gallery photo staged. Click "Add" above to include it!</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
