@@ -19,7 +19,7 @@ export async function fetchCases(): Promise<MedicalCase[]> {
     });
     remoteCases = Array.from(casesMap.values());
   } catch (error) {
-    console.info('Firestore offline or unavailable, loading from local cache / fallback.');
+    console.info('Firestore offline or unavailable, loading from local cache.');
   }
 
   // Load any locally cached custom cases
@@ -34,33 +34,15 @@ export async function fetchCases(): Promise<MedicalCase[]> {
   }
 
   const combinedMap = new Map<string, MedicalCase>();
-  // Start with default cases
-  for (const c of MEDICAL_CASES) {
-    combinedMap.set(c.id, c);
-  }
-  // Overlay remote cases
+  // Only use remote cases and local custom cases (no default sample data seeding)
   for (const c of remoteCases) {
     combinedMap.set(c.id, c);
   }
-  // Overlay local custom cases
   for (const c of localCustomCases) {
     combinedMap.set(c.id, c);
   }
 
-  let finalCases = Array.from(combinedMap.values());
-
-  // If remote was empty and no local custom cases, seed remote if possible
-  if (remoteCases.length === 0 && finalCases.length === MEDICAL_CASES.length) {
-    try {
-      for (const c of MEDICAL_CASES) {
-        await setDoc(doc(db, COLLECTION_NAME, c.id), c);
-      }
-    } catch (e) {
-      // ignore seeding error when offline
-    }
-  }
-
-  return finalCases;
+  return Array.from(combinedMap.values());
 }
 
 export async function addCaseToFirestore(newCase: MedicalCase): Promise<void> {
