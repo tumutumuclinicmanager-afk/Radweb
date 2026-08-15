@@ -72,28 +72,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   return (
     <div className="min-h-[calc(100vh-4rem)] pb-20">
       {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-b from-blue-900 via-slate-900 to-slate-950 text-white py-16 px-4 sm:px-6 lg:px-8">
+      <div className="relative overflow-hidden bg-gradient-to-b from-blue-900 via-slate-900 to-slate-950 text-white py-12 px-4 sm:px-6 lg:px-8">
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:16px_16px]"></div>
         
         <div className="max-w-5xl mx-auto relative z-10 text-center">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold mb-6 backdrop-blur-md">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold mb-4 backdrop-blur-md">
             <Sparkles className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
             Continuous Medical Education • Interactive Radiology Website
           </div>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6 leading-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight mb-4 leading-tight">
             RadMed – Master <br />
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-sky-300 to-indigo-300">
               Chest X-rays & Head CTs
             </span>
           </h1>
 
-          <p className="text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto mb-10 font-normal leading-relaxed">
+          <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto mb-6 font-normal leading-relaxed">
             Explore curated radiographic and cross-sectional brain CT carousels designed for medical students, interns, residents, and clinicians.
           </p>
 
           {/* Search Bar */}
-          <div className="max-w-xl mx-auto relative mb-8">
+          <div className="max-w-xl mx-auto relative">
             <div className="relative flex items-center">
               <Search className="absolute left-4 w-5 h-5 text-slate-400" />
               <input
@@ -101,7 +101,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="Search cases by diagnosis, finding, or keyword (e.g. Pneumothorax, Subdural)..."
-                className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white/15 transition-all text-sm sm:text-base shadow-2xl"
+                className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white/15 transition-all text-sm sm:text-base shadow-2xl"
               />
               {searchQuery && (
                 <button
@@ -158,82 +158,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </div>
             )}
           </div>
-
-          {/* Quick Stats bar */}
-          <div className="inline-flex flex-wrap items-center justify-center gap-6 sm:gap-12 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 backdrop-blur-md text-sm">
-            <div className="flex items-center gap-2">
-              <Award className="w-5 h-5 text-blue-400" />
-              <span><strong>{totalCases}</strong> Expert Cases</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              <span><strong>{progressPercent}%</strong> Mastered ({reviewedCount}/{totalCases})</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Stethoscope className="w-5 h-5 text-indigo-400" />
-              <span>CME Accredited Format</span>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Main Website Carousels & Sections */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 relative z-20 space-y-12">
+      {/* Main Website Carousels & Sections - CASES FIRST */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 relative z-20 space-y-12">
         
-        {/* Secondary Navigation Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div
-            onClick={() => setActiveView('flashcards')}
-            className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-xl border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 transition-all cursor-pointer flex items-center gap-4 group"
-          >
-            <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/80 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform flex-shrink-0">
-              <Layers className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-blue-600 transition-colors">
-                Flashcard Practice
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Flip cards & active recall test.
-              </p>
-            </div>
-          </div>
-
-          <div
-            onClick={() => setActiveView('disclaimer')}
-            className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-xl border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 transition-all cursor-pointer flex items-center gap-4 group"
-          >
-            <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-950/80 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-105 transition-transform flex-shrink-0">
-              <BookOpen className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-blue-600 transition-colors">
-                How to Use & CME Info
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Resident guidelines & report templates.
-              </p>
-            </div>
-          </div>
-
-          <div
-            onClick={() => setActiveView('disclaimer')}
-            className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-xl border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 transition-all cursor-pointer flex items-center gap-4 group"
-          >
-            <div className="w-12 h-12 rounded-xl bg-rose-50 dark:bg-rose-950/80 flex items-center justify-center text-rose-600 dark:text-rose-400 group-hover:scale-105 transition-transform flex-shrink-0">
-              <ShieldAlert className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-blue-600 transition-colors">
-                Clinical Disclaimer
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Educational reference only.
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* --- SECTION 1: CHEST X-RAY CAROUSEL --- */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -440,6 +370,81 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               );
             })}
           </div>
+        </div>
+
+        {/* --- BOTTOM SECTION: Stats & Secondary Navigation Cards --- */}
+        <div className="pt-10 border-t border-slate-200 dark:border-slate-800 space-y-8">
+          
+          {/* Quick Stats bar */}
+          <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-12 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-6 py-4 text-sm">
+            <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+              <Award className="w-5 h-5 text-blue-500" />
+              <span><strong>{totalCases}</strong> Expert Cases</span>
+            </div>
+            <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              <span><strong>{progressPercent}%</strong> Mastered ({reviewedCount}/{totalCases})</span>
+            </div>
+            <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+              <Stethoscope className="w-5 h-5 text-indigo-500" />
+              <span>CME Accredited Format</span>
+            </div>
+          </div>
+
+          {/* Secondary Navigation Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div
+              onClick={() => setActiveView('flashcards')}
+              className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-xl border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 transition-all cursor-pointer flex items-center gap-4 group"
+            >
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/80 flex items-center justify-center text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform flex-shrink-0">
+                <Layers className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-blue-600 transition-colors">
+                  Flashcard Practice
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Flip cards & active recall test.
+                </p>
+              </div>
+            </div>
+
+            <div
+              onClick={() => setActiveView('disclaimer')}
+              className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-xl border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 transition-all cursor-pointer flex items-center gap-4 group"
+            >
+              <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-950/80 flex items-center justify-center text-amber-600 dark:text-amber-400 group-hover:scale-105 transition-transform flex-shrink-0">
+                <BookOpen className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-blue-600 transition-colors">
+                  How to Use & CME Info
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Resident guidelines & report templates.
+                </p>
+              </div>
+            </div>
+
+            <div
+              onClick={() => setActiveView('disclaimer')}
+              className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-xl border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 transition-all cursor-pointer flex items-center gap-4 group"
+            >
+              <div className="w-12 h-12 rounded-xl bg-rose-50 dark:bg-rose-950/80 flex items-center justify-center text-rose-600 dark:text-rose-400 group-hover:scale-105 transition-transform flex-shrink-0">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-blue-600 transition-colors">
+                  Clinical Disclaimer
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Educational reference only.
+                </p>
+              </div>
+            </div>
+          </div>
+
         </div>
 
       </div>
