@@ -274,6 +274,13 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                   </div>
                 </div>
 
+                {/* Dedicated Bottom Title & Diagnosis Banner */}
+                <div className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 shadow-sm">
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-blue-600 dark:text-blue-400 block mb-0.5">Image Title & Diagnosis</span>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{currentCase.title}</h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">{selectedCaption}</p>
+                </div>
+
                 {/* Gallery Thumbnails Strip */}
                 {galleryImages.length > 1 && (
                   <div className="space-y-1.5">
