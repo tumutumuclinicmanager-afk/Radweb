@@ -48,11 +48,16 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
   const [zoomLevel, setZoomLevel] = useState(1);
   const [initialPinchDist, setInitialPinchDist] = useState<number | null>(null);
   const [initialZoom, setInitialZoom] = useState<number>(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [touchPanStart, setTouchPanStart] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     setSelectedImgUrl(currentCase.imageUrl);
     setSelectedCaption(currentCase.imageAlt || currentCase.title);
     setZoomLevel(1);
+    setPanOffset({ x: 0, y: 0 });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentCase]);
 
@@ -64,6 +69,12 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
       );
       setInitialPinchDist(dist);
       setInitialZoom(zoomLevel);
+      setTouchPanStart(null);
+    } else if (e.touches.length === 1 && zoomLevel > 1) {
+      setTouchPanStart({
+        x: e.touches[0].clientX - panOffset.x,
+        y: e.touches[0].clientY - panOffset.y
+      });
     }
   };
 
@@ -76,17 +87,46 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
       const factor = dist / initialPinchDist;
       const newZoom = Math.min(Math.max(1, initialZoom * factor), 4);
       setZoomLevel(newZoom);
+      if (newZoom === 1) setPanOffset({ x: 0, y: 0 });
+    } else if (e.touches.length === 1 && touchPanStart !== null && zoomLevel > 1) {
+      setPanOffset({
+        x: e.touches[0].clientX - touchPanStart.x,
+        y: e.touches[0].clientY - touchPanStart.y
+      });
     }
   };
 
   const handleTouchEnd = () => {
     setInitialPinchDist(null);
+    setTouchPanStart(null);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoomLevel > 1) {
+      setIsDragging(true);
+      setDragStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isDragging && zoomLevel > 1) {
+      setPanOffset({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
   };
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const delta = e.deltaY < 0 ? 0.25 : -0.25;
-    setZoomLevel((prev) => Math.min(Math.max(1, prev + delta), 4));
+    const newZoom = Math.min(Math.max(1, zoomLevel + delta), 4);
+    setZoomLevel(newZoom);
+    if (newZoom === 1) setPanOffset({ x: 0, y: 0 });
   };
 
   const galleryImages = [
@@ -588,7 +628,10 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                   +
                 </button>
                 <button
-                  onClick={() => setZoomLevel(1)}
+                  onClick={() => {
+                    setZoomLevel(1);
+                    setPanOffset({ x: 0, y: 0 });
+                  }}
                   className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold transition-colors"
                 >
                   Reset
@@ -606,32 +649,24 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
             {/* Zoomable Image Container */}
             <div 
               onWheel={handleWheel}
-              onTouchStart={(e) => {
-                if (e.touches.length === 1) {
-                  setTouchStartX(e.touches[0].clientX);
-                }
-                handleTouchStart(e);
-              }}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
-              onTouchEnd={(e) => {
-                if (touchStartX !== null && e.changedTouches.length === 1 && galleryImages.length > 1) {
-                  const diffX = e.changedTouches[0].clientX - touchStartX;
-                  if (Math.abs(diffX) > 50) {
-                    if (diffX > 0) handlePrevGalleryImage();
-                    else handleNextGalleryImage();
-                  }
-                  setTouchStartX(null);
-                }
-                handleTouchEnd();
-              }}
-              className="relative overflow-auto max-h-[75vh] max-w-full rounded-2xl border border-slate-800 bg-slate-950 p-2 mt-16 flex items-center justify-center touch-none select-none group"
+              onTouchEnd={handleTouchEnd}
+              className="relative overflow-hidden max-h-[75vh] max-w-full rounded-2xl border border-slate-800 bg-slate-950 p-2 mt-16 flex items-center justify-center select-none group cursor-grab active:cursor-grabbing"
             >
               <img
                 src={selectedImgUrl}
                 alt={selectedCaption}
                 onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80'; }}
-                style={{ transform: `scale(${zoomLevel})`, transition: initialPinchDist ? 'none' : 'transform 0.15s ease-out' }}
-                className="max-h-[68vh] object-contain cursor-grab active:cursor-grabbing origin-center"
+                style={{
+                  transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
+                  transition: isDragging || initialPinchDist ? 'none' : 'transform 0.15s ease-out'
+                }}
+                className="max-h-[68vh] object-contain origin-center pointer-events-none"
               />
 
               {galleryImages.length > 1 && (
@@ -668,7 +703,7 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
             </div>
 
             <div className="mt-4 text-center text-xs text-slate-400 bg-slate-900/60 px-4 py-2 rounded-xl border border-slate-800">
-              Pinch to zoom on mobile devices, use mouse wheel, or zoom controls (+) (-) above to examine finer anatomical details.
+              Pinch or mouse wheel to zoom, click and drag (or touch and drag) to move around and inspect different parts of the image when zoomed in.
             </div>
 
           </div>
