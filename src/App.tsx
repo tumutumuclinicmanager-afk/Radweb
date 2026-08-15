@@ -5,7 +5,7 @@ import { fetchCases, addCaseToFirestore, deleteCaseFromFirestore } from './servi
 import { Navbar } from './components/Navbar';
 import { HomeScreen } from './components/HomeScreen';
 import { CarouselView } from './components/CarouselView';
-import { DetailModal } from './components/DetailModal';
+import { CaseDetailView } from './components/CaseDetailView';
 import { FlashcardsView } from './components/FlashcardsView';
 import { DisclaimerModal } from './components/DisclaimerModal';
 import { AdminView } from './components/AdminView';
@@ -101,71 +101,72 @@ export default function App() {
         totalCount={cases.length}
       />
 
-      {/* Main Views */}
+      {/* Main Views or Full-Page Case View */}
       <main>
-        {activeView === 'home' && (
-          <HomeScreen
-            setActiveView={setActiveView}
-            setSelectedModality={setSelectedModality}
-            cases={cases}
+        {selectedCaseForDetail ? (
+          <CaseDetailView
+            currentCase={selectedCaseForDetail}
+            allCases={cases}
             onSelectCase={(c) => setSelectedCaseForDetail(c)}
-            reviewedCases={reviewedCases}
-          />
-        )}
-
-        {activeView === 'carousel' && (
-          <CarouselView
-            cases={cases}
-            selectedModality={selectedModality}
-            setSelectedModality={setSelectedModality}
-            onSelectCase={(c) => setSelectedCaseForDetail(c)}
-            reviewedCases={reviewedCases}
-          />
-        )}
-
-        {activeView === 'flashcards' && (
-          <FlashcardsView
-            cases={cases}
-            onBackToHome={() => setActiveView('home')}
+            onBack={() => setSelectedCaseForDetail(null)}
             onMarkReviewed={handleMarkReviewed}
-            reviewedCases={reviewedCases}
+            isReviewed={reviewedCases.includes(selectedCaseForDetail.id)}
           />
-        )}
+        ) : (
+          <>
+            {activeView === 'home' && (
+              <HomeScreen
+                setActiveView={setActiveView}
+                setSelectedModality={setSelectedModality}
+                cases={cases}
+                onSelectCase={(c) => setSelectedCaseForDetail(c)}
+                reviewedCases={reviewedCases}
+              />
+            )}
 
-        {activeView === 'disclaimer' && (
-          <DisclaimerModal
-            onClose={() => setActiveView('home')}
-          />
-        )}
+            {activeView === 'carousel' && (
+              <CarouselView
+                cases={cases}
+                selectedModality={selectedModality}
+                setSelectedModality={setSelectedModality}
+                onSelectCase={(c) => setSelectedCaseForDetail(c)}
+                reviewedCases={reviewedCases}
+              />
+            )}
 
-        {activeView === 'admin' && (
-          <AdminView
-            cases={cases}
-            onAddCase={handleAddCase}
-            onDeleteCase={handleDeleteCase}
-            onBackToHome={() => setActiveView('home')}
-          />
-        )}
+            {activeView === 'flashcards' && (
+              <FlashcardsView
+                cases={cases}
+                onBackToHome={() => setActiveView('home')}
+                onMarkReviewed={handleMarkReviewed}
+                reviewedCases={reviewedCases}
+              />
+            )}
 
-        {activeView === 'interpretation' && (
-          <InterpretationView
-            onBackToCarousel={() => setActiveView('carousel')}
-            onBackToHome={() => setActiveView('home')}
-          />
+            {activeView === 'disclaimer' && (
+              <DisclaimerModal
+                onClose={() => setActiveView('home')}
+              />
+            )}
+
+            {activeView === 'admin' && (
+              <AdminView
+                cases={cases}
+                onAddCase={handleAddCase}
+                onDeleteCase={handleDeleteCase}
+                onBackToHome={() => setActiveView('home')}
+              />
+            )}
+
+            {activeView === 'interpretation' && (
+              <InterpretationView
+                onBackToCarousel={() => setActiveView('carousel')}
+                onBackToHome={() => setActiveView('home')}
+              />
+            )}
+          </>
         )}
       </main>
-
-      {/* Detail Modal View */}
-      {selectedCaseForDetail && (
-        <DetailModal
-          currentCase={selectedCaseForDetail}
-          allCases={cases}
-          onSelectCase={(c) => setSelectedCaseForDetail(c)}
-          onClose={() => setSelectedCaseForDetail(null)}
-          onMarkReviewed={handleMarkReviewed}
-          isReviewed={reviewedCases.includes(selectedCaseForDetail.id)}
-        />
-      )}
     </div>
   );
 }

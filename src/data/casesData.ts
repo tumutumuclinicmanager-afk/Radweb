@@ -26,7 +26,12 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'Inspiration is adequate if 9 to 10 posterior ribs are visible above the diaphragm on the PA view.'
     ],
     cmeTip: 'A common pitfall is mistaking skin folds or breast shadows for pneumothorax margins. Always trace vessels past any suspected pleural line.',
-    difficulty: 'Beginner'
+    difficulty: 'Beginner',
+    galleryImages: [
+      { url: 'https://upload.wikimedia.org/wikipedia/commons/a/a4/Chest_Xray_PA_3-8-2010.png', caption: 'Posteroanterior (PA) View - Standard Inspiration' },
+      { url: 'https://upload.wikimedia.org/wikipedia/commons/3/33/Pneumonia_LLL_chest_X-ray.jpg', caption: 'Lateral View - Retrosternal and Retrocardiac Spaces' },
+      { url: 'https://upload.wikimedia.org/wikipedia/commons/6/6d/Cardiomegaly_on_CXR.jpg', caption: 'Apical View Highlighting Clavicles & First Ribs' }
+    ]
   },
   {
     id: 'cxr-2',
@@ -51,7 +56,12 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'Examine the visceral pleural line carefully; lack of lung markings beyond this line is diagnostic.'
     ],
     cmeTip: 'In supine trauma patients, a pneumothorax often accumulates anteriorly and inferiorly, producing the characteristic "deep sulcus sign".',
-    difficulty: 'Advanced'
+    difficulty: 'Advanced',
+    galleryImages: [
+      { url: 'https://upload.wikimedia.org/wikipedia/commons/1/1b/Pneumothorax_right_lung_on_chest_X-ray.jpg', caption: 'Upright PA View Showing Visceral Pleural Line' },
+      { url: 'https://upload.wikimedia.org/wikipedia/commons/5/58/Pleural_effusion_right_chest_X-ray.jpg', caption: 'Supine Trauma View with Deep Sulcus Sign' },
+      { url: 'https://upload.wikimedia.org/wikipedia/commons/a/a4/Chest_Xray_PA_3-8-2010.png', caption: 'Post-Chest Tube Re-expansion View' }
+    ]
   },
   {
     id: 'cxr-3',
@@ -76,7 +86,11 @@ export const MEDICAL_CASES: MedicalCase[] = [
       'Right middle lobe syndrome is recurrent atelectasis or infection often caused by extrinsic bronchial compression from lymphadenopathy.'
     ],
     cmeTip: 'Always obtain a lateral view to accurately localize whether an infiltrate is in the middle lobe or lower lobe.',
-    difficulty: 'Beginner'
+    difficulty: 'Beginner',
+    galleryImages: [
+      { url: 'https://upload.wikimedia.org/wikipedia/commons/3/33/Pneumonia_LLL_chest_X-ray.jpg', caption: 'PA View Highlighting Right Heart Border Silhouette Sign' },
+      { url: 'https://upload.wikimedia.org/wikipedia/commons/a/a4/Chest_Xray_PA_3-8-2010.png', caption: 'Lateral View Demonstrating Wedge Infiltrate' }
+    ]
   },
   {
     id: 'cxr-4',
