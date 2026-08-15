@@ -167,6 +167,11 @@ export default function App() {
           </>
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="py-6 px-4 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800/60 mt-12">
+        <p>Made by Godfrey Novamed Solutions &copy; {new Date().getFullYear()} — Advanced Medical Imaging & Diagnostic Intelligence</p>
+      </footer>
     </div>
   );
 }
