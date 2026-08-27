@@ -19,7 +19,21 @@ import {
   BookOpen, 
   Layers,
   CheckCircle2,
-  FileCheck
+  FileCheck,
+  Cpu,
+  Copy,
+  Check,
+  ExternalLink,
+  Code,
+  Terminal,
+  Send,
+  Zap,
+  RefreshCw,
+  Globe,
+  Key,
+  FileJson,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { researchCaseWithAI, batchResearchCasesWithAI } from '../services/aiAgentService';
 
@@ -42,8 +56,53 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState(false);
 
-  // Active Admin Tab: 'ai-agent' | 'manual'
-  const [activeTab, setActiveTab] = useState<'ai-agent' | 'manual'>('ai-agent');
+  // Active Admin Tab: 'ai-agent' | 'manual' | 'automation'
+  const [activeTab, setActiveTab] = useState<'ai-agent' | 'manual' | 'automation'>('ai-agent');
+
+  // --- AUTOMATION / N8N STATE ---
+  const [apiSecretKey] = useState<string>('radmed_admin_secret_key_2026');
+  const [showSecret, setShowSecret] = useState<boolean>(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [testEndpoint, setTestEndpoint] = useState<'curate' | 'single' | 'batch'>('curate');
+  const [isTestingApi, setIsTestingApi] = useState<boolean>(false);
+  const [apiTestResponse, setApiTestResponse] = useState<any | null>(null);
+  const [apiTestStatus, setApiTestStatus] = useState<string | null>(null);
+
+  const [curatePrompt, setCuratePrompt] = useState<string>('Acute Subdural Hematoma with Midline Shift');
+  const [curateModality, setCurateModality] = useState<Modality>('head_ct');
+  const [curateCategory, setCurateCategory] = useState<string>('Emergency Findings');
+
+  const [manualPayloadJson, setManualPayloadJson] = useState<string>(
+    JSON.stringify(
+      {
+        title: "Tension Pneumothorax with Mediastinal Shift",
+        modality: "chest_xray",
+        category: "Emergency Findings",
+        difficulty: "Intermediate",
+        question: "A 28-year-old trauma patient presents with acute pleuritic chest pain and hemodynamic compromise. What is the immediate diagnosis?",
+        diagnosis: "Right Tension Pneumothorax",
+        keyFindings: [
+          "Large right-sided visceral pleural line with absent peripheral lung markings.",
+          "Contralateral mediastinal shift toward the left.",
+          "Depression of the right hemidiaphragm."
+        ],
+        clinicalSignificance: "Life-threatening surgical emergency requiring immediate needle decompression.",
+        differentialDiagnosis: [
+          "Right Tension Pneumothorax",
+          "Simple Spontaneous Pneumothorax",
+          "Bullous Emphysema"
+        ],
+        reportingTemplate: "CHEST AP PORTABLE:\nFINDINGS: Marked right tension pneumothorax with contralateral mediastinal deviation.\nIMPRESSION: Right tension pneumothorax.",
+        teachingPoints: [
+          "Tension pneumothorax is a clinical emergency; decompression should not be delayed for imaging in unstable patients.",
+          "Check for deep sulcus sign on supine trauma radiographs."
+        ],
+        cmeTip: "High Yield: Visceral pleural line displacement with mediastinal shift distinguishes tension from simple pneumothorax."
+      },
+      null,
+      2
+    )
+  );
 
   // --- AI AGENT STATE ---
   const [aiMode, setAiMode] = useState<'research' | 'scan_analysis' | 'batch'>('research');
@@ -354,6 +413,156 @@ export const AdminView: React.FC<AdminViewProps> = ({
     { label: 'Flail Chest & Rib Fractures', mod: 'chest_xray' as Modality, cat: 'Emergency Findings' },
   ];
 
+  // Automation / n8n helpers
+  const handleCopy = (text: string, fieldId: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldId);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleTestApiCall = async () => {
+    setIsTestingApi(true);
+    setApiTestResponse(null);
+    setApiTestStatus(null);
+
+    try {
+      let endpointUrl = '/api/admin/cases';
+      let payload: any = {};
+
+      if (testEndpoint === 'curate') {
+        endpointUrl = '/api/admin/cases/curate-and-publish';
+        payload = {
+          prompt: curatePrompt,
+          modality: curateModality,
+          category: curateCategory,
+          difficulty: 'Intermediate',
+        };
+      } else if (testEndpoint === 'single') {
+        endpointUrl = '/api/admin/cases';
+        payload = JSON.parse(manualPayloadJson);
+      } else {
+        endpointUrl = '/api/admin/cases/batch';
+        payload = {
+          cases: [JSON.parse(manualPayloadJson)],
+        };
+      }
+
+      const res = await fetch(endpointUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiSecretKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      setApiTestResponse(data);
+      setApiTestStatus(res.ok ? '200 OK - Persisted in Database' : `${res.status} Error`);
+
+      if (data.success && (data.case || data.cases)) {
+        if (data.case) {
+          onAddCase(data.case);
+        } else if (Array.isArray(data.cases)) {
+          data.cases.forEach((c: MedicalCase) => onAddCase(c));
+        }
+        setSuccessMessage(`API test successful! Case written directly to Firestore.`);
+        setTimeout(() => setSuccessMessage(''), 5000);
+      }
+    } catch (err: any) {
+      setApiTestResponse({ error: err.message || 'Network error occurred' });
+      setApiTestStatus('500 Client Error');
+    } finally {
+      setIsTestingApi(false);
+    }
+  };
+
+  const getN8nTemplateJson = () => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://radmed.app';
+    return JSON.stringify(
+      {
+        name: "RadMed Autonomous Radiology Case Publisher",
+        nodes: [
+          {
+            parameters: {
+              rule: {
+                interval: [{ field: "hours", hoursInterval: 6 }]
+              }
+            },
+            name: "Schedule Trigger (Every 6h)",
+            type: "n8n-nodes-base.scheduleTrigger",
+            typeVersion: 1.1,
+            position: [250, 300]
+          },
+          {
+            parameters: {
+              model: "gemini-2.5-flash",
+              prompt: "Select a high-yield clinical emergency radiology topic, such as Tension Pneumothorax, Epidural Hematoma, or Aortic Dissection."
+            },
+            name: "AI Clinical Topic Selector",
+            type: "n8n-nodes-base.openAi",
+            typeVersion: 1,
+            position: [480, 300]
+          },
+          {
+            parameters: {
+              method: "POST",
+              url: `${origin}/api/admin/cases/curate-and-publish`,
+              authentication: "genericCredentialType",
+              genericAuthType: "httpHeaderAuth",
+              sendHeaders: true,
+              headerParameters: {
+                parameters: [
+                  {
+                    name: "Authorization",
+                    value: `Bearer ${apiSecretKey}`
+                  },
+                  {
+                    name: "Content-Type",
+                    value: "application/json"
+                  }
+                ]
+              },
+              sendBody: true,
+              specifyBody: "json",
+              jsonBody: `{\n  "prompt": "={{ $json.topic || 'Acute Tension Pneumothorax' }}",\n  "modality": "chest_xray",\n  "category": "Emergency Findings",\n  "difficulty": "Intermediate"\n}`
+            },
+            name: "RadMed Autopilot Case Publisher",
+            type: "n8n-nodes-base.httpRequest",
+            typeVersion: 4.1,
+            position: [720, 300]
+          }
+        ],
+        connections: {
+          "Schedule Trigger (Every 6h)": {
+            main: [
+              [
+                {
+                  node: "AI Clinical Topic Selector",
+                  type: "main",
+                  index: 0
+                }
+              ]
+            ]
+          },
+          "AI Clinical Topic Selector": {
+            main: [
+              [
+                {
+                  node: "RadMed Autopilot Case Publisher",
+                  type: "main",
+                  index: 0
+                }
+              ]
+            ]
+          }
+        }
+      },
+      null,
+      2
+    );
+  };
+
   // If not authenticated, show login
   if (!isAuthenticated) {
     return (
@@ -480,6 +689,16 @@ export const AdminView: React.FC<AdminViewProps> = ({
           }`}
         >
           <Edit3 className="w-4 h-4" /> Manual Case Builder {editingCaseId && `(Editing)`}
+        </button>
+        <button
+          onClick={() => setActiveTab('automation')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'automation'
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Cpu className="w-4 h-4" /> API & n8n Automation
         </button>
       </div>
 
@@ -1339,6 +1558,331 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   {editingCaseId ? 'Update Case in Database' : 'Publish New Teaching Case to Library'}
                 </button>
               </form>
+            </div>
+          )}
+
+          {/* --- TAB 3: REST WRITE API & N8N AUTOMATION HUB --- */}
+          {activeTab === 'automation' && (
+            <div className="space-y-6">
+              {/* Top Banner & Status */}
+              <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white rounded-3xl p-8 shadow-xl border border-slate-700/60 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                  <Cpu className="w-48 h-48 text-indigo-400" />
+                </div>
+
+                <div className="relative z-10 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                        <Zap className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold tracking-tight">RadMed Write API & n8n Autopilot</h2>
+                        <p className="text-xs text-slate-300">Autonomously curate, format, and publish radiology teaching cases</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-700/60 text-emerald-400 text-xs font-semibold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      API Online • Firestore Write Enabled
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-slate-300 leading-relaxed max-w-2xl">
+                    Connect external automation systems (n8n, Make, custom cron jobs, or PubMed scrapers) to publish cases directly into the cloud database without manual entry.
+                  </p>
+
+                  {/* Credentials & API Quick Copy Bar */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                    <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs text-slate-400">
+                        <span className="font-semibold flex items-center gap-1.5">
+                          <Globe className="w-3.5 h-3.5 text-blue-400" /> Autopilot Ingestion URL
+                        </span>
+                        <button
+                          onClick={() => handleCopy(`${window.location.origin}/api/admin/cases/curate-and-publish`, 'url-curate')}
+                          className="hover:text-white flex items-center gap-1 text-[11px] text-blue-400"
+                        >
+                          {copiedField === 'url-curate' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          {copiedField === 'url-curate' ? 'Copied' : 'Copy'}
+                        </button>
+                      </div>
+                      <div className="font-mono text-xs text-emerald-300 break-all select-all bg-black/40 p-2 rounded-lg">
+                        {typeof window !== 'undefined' ? window.location.origin : ''}/api/admin/cases/curate-and-publish
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs text-slate-400">
+                        <span className="font-semibold flex items-center gap-1.5">
+                          <Key className="w-3.5 h-3.5 text-amber-400" /> Admin Secret API Key
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setShowSecret(!showSecret)}
+                            className="hover:text-white text-[11px] text-slate-400 flex items-center gap-1"
+                          >
+                            {showSecret ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            {showSecret ? 'Hide' : 'Show'}
+                          </button>
+                          <button
+                            onClick={() => handleCopy(apiSecretKey, 'api-key')}
+                            className="hover:text-white flex items-center gap-1 text-[11px] text-blue-400"
+                          >
+                            {copiedField === 'api-key' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiedField === 'api-key' ? 'Copied' : 'Copy'}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="font-mono text-xs text-amber-300 break-all select-all bg-black/40 p-2 rounded-lg">
+                        {showSecret ? apiSecretKey : '••••••••••••••••••••••••••••••••'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Endpoints & Autonomy Methods Catalog */}
+              <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-200 dark:border-slate-800 space-y-5">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Terminal className="w-5 h-5 text-indigo-600" /> Available API Methods for n8n & Autonomous Agents
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Method 1 */}
+                  <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-indigo-600 text-white">POST</span>
+                      <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Autonomous</span>
+                    </div>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white">/api/admin/cases/curate-and-publish</h4>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                      Pass only a topic or prompt. The server AI formats key findings, differential diagnoses, templates, and saves to Firestore.
+                    </p>
+                  </div>
+
+                  {/* Method 2 */}
+                  <div className="p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-blue-600 text-white">POST</span>
+                      <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">Direct Ingest</span>
+                    </div>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white">/api/admin/cases</h4>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                      Publish pre-structured ACR radiology cases generated directly by your n8n workflow nodes.
+                    </p>
+                  </div>
+
+                  {/* Method 3 */}
+                  <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/50 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-600 text-white">POST</span>
+                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Bulk Batch</span>
+                    </div>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white">/api/admin/cases/batch</h4>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                      Publish arrays of multiple cases in a single payload. Ideal for nightly automated curation feeds.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive In-UI Live Test Workbench */}
+              <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-200 dark:border-slate-800 space-y-5">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Send className="w-5 h-5 text-emerald-600" /> Interactive API Test Console
+                    </h3>
+                    <p className="text-xs text-slate-500">Test webhook delivery directly to verify Firestore database storage</p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                    <button
+                      onClick={() => setTestEndpoint('curate')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        testEndpoint === 'curate'
+                          ? 'bg-indigo-600 text-white shadow-sm'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                    >
+                      Autopilot Curate
+                    </button>
+                    <button
+                      onClick={() => setTestEndpoint('single')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        testEndpoint === 'single'
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                    >
+                      Structured JSON
+                    </button>
+                  </div>
+                </div>
+
+                {/* Form or JSON editor based on selected test endpoint */}
+                {testEndpoint === 'curate' ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                        Clinical Topic / Case Concept
+                      </label>
+                      <input
+                        type="text"
+                        value={curatePrompt}
+                        onChange={(e) => setCuratePrompt(e.target.value)}
+                        placeholder="e.g., Acute Subarachnoid Hemorrhage or Right Middle Lobe Pneumonia"
+                        className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                          Modality
+                        </label>
+                        <select
+                          value={curateModality}
+                          onChange={(e) => setCurateModality(e.target.value as Modality)}
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white"
+                        >
+                          <option value="chest_xray">Chest Radiograph (CXR)</option>
+                          <option value="head_ct">Non-Contrast Head CT</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
+                          Category
+                        </label>
+                        <select
+                          value={curateCategory}
+                          onChange={(e) => setCurateCategory(e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white"
+                        >
+                          <option value="Emergency Findings">Emergency Findings</option>
+                          <option value="Common Pathology">Common Pathology</option>
+                          <option value="Normal">Normal Anatomy</option>
+                          <option value="Post-Procedural">Post-Procedural</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                      Payload JSON Body
+                    </label>
+                    <textarea
+                      rows={9}
+                      value={manualPayloadJson}
+                      onChange={(e) => setManualPayloadJson(e.target.value)}
+                      className="w-full p-3.5 font-mono text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-950 text-emerald-400 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-4 pt-2">
+                  <button
+                    onClick={handleTestApiCall}
+                    disabled={isTestingApi}
+                    className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold rounded-xl shadow-lg flex items-center gap-2 disabled:opacity-50 transition-all cursor-pointer"
+                  >
+                    {isTestingApi ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    {isTestingApi ? 'Executing Webhook Write...' : 'Execute Test API Call to Live DB'}
+                  </button>
+
+                  {apiTestStatus && (
+                    <span className={`text-xs font-bold px-3 py-1.5 rounded-lg ${
+                      apiTestStatus.includes('200')
+                        ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                        : 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300'
+                    }`}>
+                      {apiTestStatus}
+                    </span>
+                  )}
+                </div>
+
+                {/* API Response Output Viewer */}
+                {apiTestResponse && (
+                  <div className="space-y-2 pt-2 animate-fade-in">
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span className="font-mono font-semibold">Live Server Response</span>
+                      <button
+                        onClick={() => handleCopy(JSON.stringify(apiTestResponse, null, 2), 'test-resp')}
+                        className="hover:text-slate-900 dark:hover:text-white flex items-center gap-1 text-[11px]"
+                      >
+                        {copiedField === 'test-resp' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copiedField === 'test-resp' ? 'Copied' : 'Copy Response'}
+                      </button>
+                    </div>
+                    <pre className="p-4 rounded-2xl bg-slate-950 text-emerald-400 font-mono text-xs overflow-x-auto max-h-60 border border-slate-800">
+                      {JSON.stringify(apiTestResponse, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+
+              {/* Ready-to-Import n8n Workflow Blueprint */}
+              <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-200 dark:border-slate-800 space-y-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <FileJson className="w-5 h-5 text-amber-500" /> 1-Click n8n Workflow Blueprint
+                    </h3>
+                    <p className="text-xs text-slate-500">Copy and paste directly into your n8n workflow canvas (Ctrl + V)</p>
+                  </div>
+
+                  <button
+                    onClick={() => handleCopy(getN8nTemplateJson(), 'n8n-json')}
+                    className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-md flex items-center gap-2 transition-all cursor-pointer"
+                  >
+                    {copiedField === 'n8n-json' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    {copiedField === 'n8n-json' ? 'Workflow Copied!' : 'Copy n8n Canvas JSON'}
+                  </button>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-3">
+                  <div className="text-xs font-semibold text-slate-800 dark:text-slate-200">How to load in n8n:</div>
+                  <ol className="text-xs text-slate-600 dark:text-slate-400 space-y-1.5 list-decimal list-inside">
+                    <li>Open your <span className="font-semibold text-slate-800 dark:text-slate-200">n8n canvas</span> in your browser.</li>
+                    <li>Click the <span className="font-semibold text-amber-600 dark:text-amber-400">Copy n8n Canvas JSON</span> button above.</li>
+                    <li>Click anywhere on the n8n canvas and press <kbd className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 font-mono text-[11px]">Ctrl + V</kbd> (or <kbd className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 font-mono text-[11px]">Cmd + V</kbd>).</li>
+                    <li>The complete Schedule + AI Topic Generator + HTTP Autopilot node pipeline will instantly appear ready to execute!</li>
+                  </ol>
+                </div>
+              </div>
+
+              {/* Code Snippets (cURL, Python, Node.js) */}
+              <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-slate-200 dark:border-slate-800 space-y-4">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Code className="w-5 h-5 text-blue-600" /> Direct Integration Snippets
+                </h3>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span className="font-bold uppercase tracking-wider text-[11px]">cURL Example</span>
+                    <button
+                      onClick={() => handleCopy(`curl -X POST "${typeof window !== 'undefined' ? window.location.origin : ''}/api/admin/cases/curate-and-publish" \\\n  -H "Authorization: Bearer ${apiSecretKey}" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "prompt": "Tension Pneumothorax",\n    "modality": "chest_xray",\n    "category": "Emergency Findings"\n  }'`, 'curl-snip')}
+                      className="hover:text-slate-900 dark:hover:text-white flex items-center gap-1 text-[11px]"
+                    >
+                      {copiedField === 'curl-snip' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedField === 'curl-snip' ? 'Copied' : 'Copy cURL'}
+                    </button>
+                  </div>
+                  <pre className="p-4 rounded-2xl bg-slate-950 text-blue-300 font-mono text-xs overflow-x-auto border border-slate-800">
+{`curl -X POST "${typeof window !== 'undefined' ? window.location.origin : 'https://radmed.app'}/api/admin/cases/curate-and-publish" \\
+  -H "Authorization: Bearer ${apiSecretKey}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "prompt": "Tension Pneumothorax",
+    "modality": "chest_xray",
+    "category": "Emergency Findings"
+  }'`}
+                  </pre>
+                </div>
+              </div>
             </div>
           )}
         </div>

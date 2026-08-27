@@ -13,8 +13,14 @@
         "imageAlt": { "type": "string" },
         "question": { "type": "string" },
         "diagnosis": { "type": "string" },
+        "keyFindings": { "type": "array", "items": { "type": "string" } },
         "clinicalSignificance": { "type": "string" },
-        "difficulty": { "type": "string" }
+        "differentialDiagnosis": { "type": "array", "items": { "type": "string" } },
+        "reportingTemplate": { "type": "string" },
+        "teachingPoints": { "type": "array", "items": { "type": "string" } },
+        "cmeTip": { "type": "string" },
+        "difficulty": { "type": "string" },
+        "galleryImages": { "type": "array", "items": { "type": "object" } }
       },
       "required": ["id", "title", "modality", "category", "imageUrl", "diagnosis"]
     }
