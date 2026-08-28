@@ -49,24 +49,54 @@ export function savePremiumStatus(receiptNumber?: string, phoneNumber?: string, 
   }
 }
 
+// Safe response parser that handles HTML error pages from proxies/CDNs gracefully
+async function safeJsonParse(res: Response): Promise<{ ok: boolean; status: number; data: any; rawText: string }> {
+  const status = res.status;
+  const rawText = await res.text().catch(() => '');
+  try {
+    const data = JSON.parse(rawText);
+    return { ok: res.ok, status, data, rawText };
+  } catch {
+    // Clean snippet of HTML or text for user display
+    const cleanSnippet = rawText
+      .replace(/<[^>]*>?/gm, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .substring(0, 150);
+
+    return {
+      ok: false,
+      status,
+      data: {
+        success: false,
+        error: cleanSnippet ? `Server returned HTTP ${status}: ${cleanSnippet}` : `Server returned HTTP ${status} (Non-JSON response)`,
+      },
+      rawText,
+    };
+  }
+}
+
 // Fetch public payment configuration
 export async function fetchPaymentConfig(): Promise<PaymentConfig> {
   try {
     const res = await fetch('/api/payment/config');
-    if (!res.ok) throw new Error('Failed to load payment config');
-    const data = await res.json();
-    return data.config;
-  } catch {
-    return {
-      freeCasesLimit: 5,
-      premiumPriceKes: 1000,
-      activeProvider: 'mpesa_daraja',
-      darajaEnvironment: 'sandbox',
-      darajaBusinessShortcode: '174379',
-      paybillOrTillNumber: '174379',
-      accountReference: 'RadMed Pro',
-    };
+    const parsed = await safeJsonParse(res);
+    if (parsed.ok && parsed.data?.config) {
+      return parsed.data.config;
+    }
+  } catch (err) {
+    console.warn('Could not fetch server payment config, using defaults:', err);
   }
+  return {
+    freeCasesLimit: 5,
+    premiumPriceKes: 1000,
+    activeProvider: 'palpluss',
+    palplussApiKey: 'pp_live_2f9aa2197ab69a9a6915bd538f519a059ffd7e6ca6568b68',
+    darajaEnvironment: 'sandbox',
+    darajaBusinessShortcode: '174379',
+    paybillOrTillNumber: '174379',
+    accountReference: 'RadMed Pro',
+  };
 }
 
 // Initiate M-Pesa STK Push
@@ -83,7 +113,14 @@ export async function initiateMpesaStkPush(phoneNumber: string, amount?: number)
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phoneNumber, amount }),
     });
-    return await res.json();
+    const parsed = await safeJsonParse(res);
+    if (parsed.data && typeof parsed.data === 'object') {
+      return parsed.data;
+    }
+    return {
+      success: false,
+      error: `Payment server returned status ${parsed.status}.`,
+    };
   } catch (err: any) {
     return { success: false, error: err.message || 'Network error initiating STK push' };
   }
@@ -99,7 +136,11 @@ export async function pollPaymentStatus(checkoutRequestId: string): Promise<{
 }> {
   try {
     const res = await fetch(`/api/payment/status/${encodeURIComponent(checkoutRequestId)}`);
-    return await res.json();
+    const parsed = await safeJsonParse(res);
+    if (parsed.data && typeof parsed.data === 'object' && parsed.data.status) {
+      return parsed.data;
+    }
+    return { success: false, status: 'PENDING' };
   } catch {
     return { success: false, status: 'PENDING' };
   }
@@ -118,17 +159,18 @@ export async function verifyManualMpesaCode(mpesaCode: string, phoneNumber?: str
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mpesaCode, phoneNumber }),
     });
-    const data = await res.json();
-    if (data.success) {
+    const parsed = await safeJsonParse(res);
+    const data = parsed.data;
+    if (data?.success) {
       savePremiumStatus(mpesaCode.toUpperCase(), phoneNumber, 'manual_mpesa');
     }
-    return data;
+    return data || { success: false, error: 'Verification response format invalid' };
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to verify M-Pesa code' };
   }
 }
 
-// Test PalPluss API Connection and retrieve Channels
+// Test PalPluss API Connection and retrieve Status/Channels
 export async function testPalPlussApi(apiKey?: string, adminKey = 'radmed_admin_secret_key_2026'): Promise<{
   success: boolean;
   message?: string;
@@ -144,7 +186,16 @@ export async function testPalPlussApi(apiKey?: string, adminKey = 'radmed_admin_
       },
       body: JSON.stringify({ palplussApiKey: apiKey }),
     });
-    return await res.json();
+
+    const parsed = await safeJsonParse(res);
+    if (parsed.data && typeof parsed.data === 'object') {
+      return parsed.data;
+    }
+
+    return {
+      success: false,
+      error: `Test endpoint returned non-JSON HTTP ${parsed.status}.`,
+    };
   } catch (err: any) {
     return { success: false, error: err.message || 'Network error connecting to PalPluss test endpoint' };
   }
@@ -169,7 +220,8 @@ export async function updatePaymentConfig(
       },
       body: JSON.stringify(config),
     });
-    return await res.json();
+    const parsed = await safeJsonParse(res);
+    return parsed.data || { success: false, error: 'Failed to update payment configuration' };
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to save payment configuration' };
   }
