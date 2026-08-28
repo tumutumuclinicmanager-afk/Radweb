@@ -1095,19 +1095,34 @@ app.post('/api/payment/mpesa/stkpush', async (req, res) => {
       try {
         const palplussAuthHeader = getPalPlussAuthHeader(palplussKey);
         const channelId = paymentConfig.palplussChannelId || process.env.PALPLUSS_CHANNEL_ID;
-        const callbackUrl = `${process.env.APP_URL || 'https://radmed-chi.vercel.app'}/api/payment/palpluss/callback`;
+        
+        // Dynamically compute the callback URL for the active deployment
+        const hostHeader = req.get('host') || (req.headers['x-forwarded-host'] as string) || '';
+        const protoHeader = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
+        let callbackUrl = process.env.APP_URL ? `${process.env.APP_URL.replace(/\/$/, '')}/api/payment/palpluss/callback` : '';
+        
+        if (!callbackUrl) {
+          if (hostHeader && !hostHeader.includes('localhost') && !hostHeader.includes('127.0.0.1')) {
+            callbackUrl = `${protoHeader}://${hostHeader}/api/payment/palpluss/callback`;
+          } else {
+            callbackUrl = 'https://ais-pre-4exbewjhriw2i7ti4o2y4u-707618590443.europe-west2.run.app/api/payment/palpluss/callback';
+          }
+        }
 
         const palplussPayload: Record<string, any> = {
           amount: payableAmount,
           phoneNumber: formattedPhone,
+          phone: formattedPhone,
           accountReference: paymentConfig.accountReference.substring(0, 12),
           transactionDesc: 'RadMed Pro'.substring(0, 13),
           callbackUrl: callbackUrl,
         };
 
         if (channelId) {
-          palplussPayload.channelId = channelId;
+          palplussPayload.channelId = channelId.trim();
         }
+
+        console.log('[PalPluss] Dispatching STK push to:', formattedPhone, 'Amount:', payableAmount, 'Payload:', JSON.stringify(palplussPayload));
 
         const palplussResp = await fetch('https://api.palpluss.com/v1/payments/stk', {
           method: 'POST',
@@ -1118,8 +1133,10 @@ app.post('/api/payment/mpesa/stkpush', async (req, res) => {
           body: JSON.stringify(palplussPayload),
         });
 
-        const palData: any = await palplussResp.json();
-        if (palplussResp.ok && (palData.success !== false)) {
+        const palData: any = await palplussResp.json().catch(() => null);
+        console.log('[PalPluss] STK push response status:', palplussResp.status, 'Data:', JSON.stringify(palData));
+
+        if (palplussResp.ok && palData && palData.success !== false) {
           const liveTxId = palData.data?.transactionId || palData.transactionId || palData.data?.id || palData.id || checkoutId;
           txRecord.id = liveTxId;
           txRecord.checkoutRequestId = liveTxId;
@@ -1135,17 +1152,26 @@ app.post('/api/payment/mpesa/stkpush', async (req, res) => {
             mode: 'palpluss_live',
           });
         } else {
-          console.warn('PalPluss API responded with error:', palData);
-          // If PalPluss returns a specific message, include it
-          if (palData.message || palData.error) {
-            return res.status(400).json({
-              success: false,
-              error: `PalPluss error: ${palData.message || palData.error}`,
-            });
-          }
+          console.warn('[PalPluss] STK push error received:', palData);
+          const errorMsg =
+            palData?.error?.message ||
+            palData?.error?.details?.message ||
+            palData?.message ||
+            (typeof palData?.error === 'string' ? palData.error : null) ||
+            `PalPluss STK push failed with HTTP ${palplussResp.status}`;
+
+          return res.status(palplussResp.status >= 400 ? palplussResp.status : 400).json({
+            success: false,
+            error: errorMsg,
+            details: palData,
+          });
         }
       } catch (palErr: any) {
-        console.error('Error dispatching PalPluss STK Push:', palErr);
+        console.error('[PalPluss] Exception dispatching STK push:', palErr);
+        return res.status(500).json({
+          success: false,
+          error: `Error communicating with PalPluss payment gateway: ${palErr.message}`,
+        });
       }
     }
 
