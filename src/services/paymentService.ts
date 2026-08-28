@@ -64,10 +64,21 @@ export function savePremiumStatus(receiptNumber?: string, phoneNumber?: string, 
 async function safeJsonParse(res: Response): Promise<{ ok: boolean; status: number; data: any; rawText: string; isHtml404: boolean }> {
   const status = res.status;
   const rawText = await res.text().catch(() => '');
-  const isHtml404 = status === 404 || rawText.includes('NOT_FOUND') || rawText.includes('404') || rawText.includes('<!DOCTYPE') || rawText.includes('<html');
+  const isHtmlOrStatic =
+    status === 404 ||
+    status === 405 ||
+    status === 502 ||
+    status === 503 ||
+    rawText.includes('NOT_FOUND') ||
+    rawText.includes('404') ||
+    rawText.includes('405') ||
+    rawText.includes('Method Not Allowed') ||
+    rawText.includes('<!DOCTYPE') ||
+    rawText.includes('<html');
+
   try {
     const data = JSON.parse(rawText);
-    return { ok: res.ok, status, data, rawText, isHtml404: false };
+    return { ok: res.ok, status, data, rawText, isHtml404: isHtmlOrStatic && !res.ok };
   } catch {
     // Clean snippet of HTML or text for user display
     const cleanSnippet = rawText
@@ -81,10 +92,10 @@ async function safeJsonParse(res: Response): Promise<{ ok: boolean; status: numb
       status,
       data: {
         success: false,
-        error: cleanSnippet ? `Server returned HTTP ${status}: ${cleanSnippet}` : `Server returned HTTP ${status} (Non-JSON response)`,
+        error: cleanSnippet ? `Server response (${status}): ${cleanSnippet}` : `Server returned HTTP ${status}`,
       },
       rawText,
-      isHtml404,
+      isHtml404: true,
     };
   }
 }
