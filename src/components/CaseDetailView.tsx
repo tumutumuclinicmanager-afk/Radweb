@@ -22,7 +22,7 @@ import {
   Zap
 } from 'lucide-react';
 import { MedicalCase } from '../types';
-import { isCaseLocked, getCaseCategoryIndex } from '../services/paymentService';
+import { isCaseLocked, getCaseCategoryIndex, FREE_CXR_LIMIT, FREE_CT_LIMIT } from '../services/paymentService';
 
 interface CaseDetailViewProps {
   currentCase: MedicalCase;
@@ -48,7 +48,7 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
   const [activeTab, setActiveTab] = useState<'findings' | 'clinical' | 'reporting' | 'teaching' | 'gallery'>('findings');
   const [copied, setCopied] = useState(false);
 
-  const isLocked = isCaseLocked(currentCase, allCases, isPremium, 5);
+  const isLocked = isCaseLocked(currentCase, allCases, isPremium);
   const { indexInCategory, totalInCategory } = getCaseCategoryIndex(currentCase, allCases);
 
   // Gallery image selection state
@@ -468,13 +468,13 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
 
                       <div className="max-w-md mx-auto space-y-2">
                         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-400/30">
-                          <Lock className="w-3.5 h-3.5" /> Premium Case #{indexInCategory} of {totalInCategory}
+                          <Lock className="w-3.5 h-3.5" /> Premium Case
                         </div>
                         <h2 className="text-xl sm:text-2xl font-extrabold text-white">
                           Unlock Diagnosis & Reporting Template
                         </h2>
                         <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                          This case is outside your 5 free tier cases in <strong>{currentCase.category}</strong>. Unlock complete radiologist findings, teaching points, differential diagnoses, and standardized templates with M-Pesa.
+                          Free access includes {FREE_CXR_LIMIT} Chest X-rays & {FREE_CT_LIMIT} Head CT scans. Unlock complete radiologist findings, teaching points, differential diagnoses, and standardized templates with lifetime access.
                         </p>
                       </div>
 

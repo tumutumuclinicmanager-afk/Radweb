@@ -44,6 +44,15 @@ export function markUserAsPremium(receiptNumber?: string, phoneNumber?: string):
   savePremiumStatus(receiptNumber, phoneNumber);
 }
 
+// Clear premium status (for free tier or logout)
+export function clearPremiumStatus(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (err) {
+    console.warn('Failed to clear from localStorage:', err);
+  }
+}
+
 // Save unlocked premium state
 export function savePremiumStatus(receiptNumber?: string, phoneNumber?: string, provider = 'mpesa_daraja'): void {
   const record: PremiumAccessRecord = {
@@ -405,39 +414,59 @@ export async function updatePaymentConfig(
   };
 }
 
-// Check if a specific case is locked based on 5 free cases per category rule
+// Free tier limits requested by user: 5 Chest X-Ray cases and 2 Head CT scans
+export const FREE_CXR_LIMIT = 5;
+export const FREE_CT_LIMIT = 2;
+
+// Check if a specific case is locked (Free: 5 Chest X-rays, 2 Head CTs; All others locked)
 export function isCaseLocked(
   targetCase: MedicalCase,
   allCases: MedicalCase[],
-  isPremiumUser: boolean,
-  freeCasesLimit = 5
+  isPremiumUser: boolean
 ): boolean {
   if (isPremiumUser) {
     return false;
   }
 
-  // Get all cases in the exact same modality and category
-  const categoryCases = allCases.filter(
-    (c) => c.modality === targetCase.modality && c.category === targetCase.category
-  );
+  // Get all cases in the exact same modality
+  const modalityCases = allCases.filter((c) => c.modality === targetCase.modality);
+  const index = modalityCases.findIndex((c) => c.id === targetCase.id);
 
-  const index = categoryCases.findIndex((c) => c.id === targetCase.id);
-  // If not found or among the first 5, it is free
+  // If not found in the list, fallback to free
   if (index === -1) return false;
-  return index >= freeCasesLimit;
+
+  const limit = targetCase.modality === 'chest_xray' ? FREE_CXR_LIMIT : FREE_CT_LIMIT;
+  return index >= limit;
 }
 
-// Get the 1-based index and free status of a case in its category
+// Get the 1-based index and free status of a case in its modality
+export function getCaseModalityIndex(
+  targetCase: MedicalCase,
+  allCases: MedicalCase[]
+): { indexInModality: number; totalInModality: number; isFree: boolean; limit: number } {
+  const modalityCases = allCases.filter((c) => c.modality === targetCase.modality);
+  const index = modalityCases.findIndex((c) => c.id === targetCase.id);
+  const limit = targetCase.modality === 'chest_xray' ? FREE_CXR_LIMIT : FREE_CT_LIMIT;
+  const isFree = index >= 0 && index < limit;
+
+  return {
+    indexInModality: index >= 0 ? index + 1 : 1,
+    totalInModality: modalityCases.length,
+    isFree,
+    limit,
+  };
+}
+
+// Legacy helper for backward compatibility
 export function getCaseCategoryIndex(
   targetCase: MedicalCase,
   allCases: MedicalCase[]
-): { indexInCategory: number; totalInCategory: number } {
-  const categoryCases = allCases.filter(
-    (c) => c.modality === targetCase.modality && c.category === targetCase.category
-  );
-  const index = categoryCases.findIndex((c) => c.id === targetCase.id);
+): { indexInCategory: number; totalInCategory: number; isFree: boolean } {
+  const info = getCaseModalityIndex(targetCase, allCases);
   return {
-    indexInCategory: index >= 0 ? index + 1 : 1,
-    totalInCategory: categoryCases.length,
+    indexInCategory: info.indexInModality,
+    totalInCategory: info.totalInModality,
+    isFree: info.isFree,
   };
 }
+

@@ -13,5 +13,14 @@ service cloud.firestore {
     match /transactions/{transactionId} {
       allow read, write: if isValidId(transactionId);
     }
+
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if isValidId(userId);
+    }
+
+    match /settings/{settingId} {
+      allow read, write: if isValidId(settingId);
+    }
   }
 }

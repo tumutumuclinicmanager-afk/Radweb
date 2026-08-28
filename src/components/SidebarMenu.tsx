@@ -1,6 +1,7 @@
 import React from 'react';
-import { Stethoscope, BookOpen, Layers, Moon, Sun, Home, ShieldAlert, Lock, X, CheckCircle2, Smartphone, ShieldCheck, Zap } from 'lucide-react';
-import { ActiveView } from '../types';
+import { Stethoscope, BookOpen, Layers, Moon, Sun, Home, ShieldAlert, Lock, X, CheckCircle2, Smartphone, ShieldCheck, Zap, User, LogIn } from 'lucide-react';
+import { ActiveView, UserProfile } from '../types';
+import { FREE_CXR_LIMIT, FREE_CT_LIMIT } from '../services/paymentService';
 
 interface SidebarMenuProps {
   isOpen: boolean;
@@ -13,6 +14,8 @@ interface SidebarMenuProps {
   totalCount: number;
   isPremium: boolean;
   onOpenPaymentModal: () => void;
+  currentUser: UserProfile | null;
+  onOpenAuthModal: (tab?: 'login' | 'register') => void;
 }
 
 export const SidebarMenu: React.FC<SidebarMenuProps> = ({
@@ -26,6 +29,8 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
   totalCount,
   isPremium,
   onOpenPaymentModal,
+  currentUser,
+  onOpenAuthModal,
 }) => {
   const progressPercentage = Math.round((reviewedCount / totalCount) * 100) || 0;
 
@@ -66,6 +71,43 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* User Account Card */}
+        <div className="p-3 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-800/40">
+          {currentUser ? (
+            <div 
+              onClick={() => { onClose(); onOpenAuthModal('login'); }}
+              className="flex items-center justify-between p-2 rounded-xl hover:bg-white dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+                  <User className="w-4 h-4" />
+                </div>
+                <div className="truncate">
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                    {currentUser.displayName || currentUser.email}
+                  </h4>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" /> {currentUser.isPremium ? 'Lifetime Pro' : 'Free Member'}
+                  </span>
+                </div>
+              </div>
+              <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">Account →</span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-2 p-1">
+              <div className="text-[11px] text-slate-600 dark:text-slate-400">
+                <span>Save your lifetime access</span>
+              </div>
+              <button
+                onClick={() => { onClose(); onOpenAuthModal('login'); }}
+                className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <LogIn className="w-3 h-3" /> Log In
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Navigation Items */}
@@ -141,7 +183,7 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-300 mb-3 leading-relaxed">
-                  5 free cases per category. Pay <strong>KES 1,000</strong> once for lifetime unlimited access.
+                  Free tier: {FREE_CXR_LIMIT} Chest X-rays & {FREE_CT_LIMIT} Head CTs. Pay <strong>KES 1,000</strong> once for permanent lifetime access.
                 </p>
                 <button
                   onClick={() => { onClose(); onOpenPaymentModal(); }}
@@ -197,4 +239,5 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
     </div>
   );
 };
+
 

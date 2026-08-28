@@ -39,6 +39,34 @@
         "createdAt": { "type": "string" }
       },
       "required": ["id", "phoneNumber", "amount", "status", "createdAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile with lifetime access credentials",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "isPremium": { "type": "boolean" },
+        "mpesaReceiptNumber": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "unlockedAt": { "type": "string" },
+        "provider": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "isPremium"]
+    },
+    "AdminSettings": {
+      "title": "AdminSettings",
+      "description": "System security and administrative credentials",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "adminPassword": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "adminPassword"]
     }
   },
   "firestore": {
@@ -49,6 +77,14 @@
     "/transactions/{transactionId}": {
       "schema": "PaymentTransaction",
       "description": "Payment transactions collection"
+    },
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles with lifetime premium access"
+    },
+    "/settings/{settingId}": {
+      "schema": "AdminSettings",
+      "description": "Admin and system configuration records"
     }
   }
 }

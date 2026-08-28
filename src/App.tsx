@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ActiveView, Modality, MedicalCase } from './types';
+import { ActiveView, Modality, MedicalCase, UserProfile } from './types';
 import { MEDICAL_CASES } from './data/casesData';
 import { fetchCases, addCaseToFirestore, deleteCaseFromFirestore } from './services/casesService';
-import { getIsPremiumStatus, markUserAsPremium } from './services/paymentService';
+import { getIsPremiumStatus, markUserAsPremium, clearPremiumStatus } from './services/paymentService';
+import { subscribeToAuth, updateUserPremiumStatusInFirestore } from './services/authService';
 import { Navbar } from './components/Navbar';
 import { HomeScreen } from './components/HomeScreen';
 import { CarouselView } from './components/CarouselView';
@@ -12,17 +13,50 @@ import { DisclaimerModal } from './components/DisclaimerModal';
 import { AdminView } from './components/AdminView';
 import { InterpretationView } from './components/InterpretationView';
 import { MpesaPaymentModal } from './components/MpesaPaymentModal';
+import { AuthModal } from './components/AuthModal';
 
 export default function App() {
   const [activeView, setActiveView] = useState<ActiveView>('home');
   const [selectedModality, setSelectedModality] = useState<Modality>('chest_xray');
   const [cases, setCases] = useState<MedicalCase[]>(MEDICAL_CASES);
 
-  // M-Pesa Premium State
+  // User Authentication & Lifetime Pro Access State
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isPremium, setIsPremium] = useState<boolean>(() => getIsPremiumStatus());
+  
+  // Payment Modal State
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentModalCategory, setPaymentModalCategory] = useState<string | undefined>(undefined);
   const [paymentModalTitle, setPaymentModalTitle] = useState<string | undefined>(undefined);
+
+  // Auth Modal State
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalTab, setAuthModalTab] = useState<'login' | 'register'>('login');
+  const [authModalPostPayment, setAuthModalPostPayment] = useState(false);
+  const [pendingReceipt, setPendingReceipt] = useState<string | undefined>(undefined);
+
+  // Listen to Firebase Auth state changes
+  useEffect(() => {
+    const unsubscribe = subscribeToAuth((user) => {
+      setCurrentUser(user);
+      if (user) {
+        const hasPremium = Boolean(user.isPremium);
+        setIsPremium(hasPremium);
+        if (hasPremium) {
+          markUserAsPremium(user.mpesaReceiptNumber, user.phoneNumber);
+        } else {
+          clearPremiumStatus();
+        }
+      } else {
+        setIsPremium(getIsPremiumStatus());
+      }
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, []);
 
   const handleOpenPaymentModal = (category?: string, caseTitle?: string) => {
     setPaymentModalCategory(category);
@@ -30,9 +64,29 @@ export default function App() {
     setPaymentModalOpen(true);
   };
 
-  const handlePaymentSuccess = () => {
+  const handleOpenAuthModal = (tab: 'login' | 'register' = 'login') => {
+    setAuthModalTab(tab);
+    setAuthModalPostPayment(false);
+    setPendingReceipt(undefined);
+    setAuthModalOpen(true);
+  };
+
+  const handlePaymentSuccess = async (createdProfile?: UserProfile) => {
     markUserAsPremium();
     setIsPremium(true);
+
+    if (createdProfile) {
+      setCurrentUser(createdProfile);
+    } else if (currentUser && currentUser.uid) {
+      // If user was already logged in as a free account, upgrade them in Firestore to lifetime premium
+      await updateUserPremiumStatusInFirestore(currentUser.uid, {
+        isPremium: true,
+      });
+      setCurrentUser({
+        ...currentUser,
+        isPremium: true,
+      });
+    }
   };
 
   useEffect(() => {
@@ -120,6 +174,8 @@ export default function App() {
         totalCount={cases.length}
         isPremium={isPremium}
         onOpenPaymentModal={() => handleOpenPaymentModal()}
+        currentUser={currentUser}
+        onOpenAuthModal={handleOpenAuthModal}
       />
 
       {/* Main Views or Full-Page Case View */}
@@ -200,8 +256,36 @@ export default function App() {
         isOpen={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}
         onPaymentSuccess={handlePaymentSuccess}
+        onOpenLoginModal={() => {
+          setPaymentModalOpen(false);
+          handleOpenAuthModal('login');
+        }}
         selectedCategory={paymentModalCategory}
         caseTitle={paymentModalTitle}
+      />
+
+      {/* Auth Modal (Login / Register / Post-Payment Linking) */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        currentUser={currentUser}
+        onUserChanged={(user) => {
+          setCurrentUser(user);
+          if (user?.isPremium) {
+            setIsPremium(true);
+            markUserAsPremium(user.mpesaReceiptNumber, user.phoneNumber);
+          } else {
+            setIsPremium(false);
+            clearPremiumStatus();
+          }
+        }}
+        defaultTab={authModalTab}
+        isPostPayment={authModalPostPayment}
+        mpesaReceipt={pendingReceipt}
+        onOpenPayment={() => {
+          setAuthModalOpen(false);
+          handleOpenPaymentModal();
+        }}
       />
 
       {/* Footer */}

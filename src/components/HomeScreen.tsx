@@ -20,7 +20,7 @@ import {
   Zap
 } from 'lucide-react';
 import { ActiveView, Modality, MedicalCase } from '../types';
-import { isCaseLocked } from '../services/paymentService';
+import { isCaseLocked, FREE_CXR_LIMIT, FREE_CT_LIMIT } from '../services/paymentService';
 
 interface HomeScreenProps {
   setActiveView: (view: ActiveView) => void;
@@ -79,7 +79,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const progressPercent = totalCases > 0 ? Math.round((reviewedCount / totalCases) * 100) : 0;
 
   const handleCaseClick = (c: MedicalCase) => {
-    const locked = isCaseLocked(c, cases, isPremium, 5);
+    const locked = isCaseLocked(c, cases, isPremium);
     if (locked) {
       onOpenPaymentModal(c.category, c.title);
     } else {
@@ -148,7 +148,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   </div>
                 ) : (
                   searchResults.map(c => {
-                    const locked = isCaseLocked(c, cases, isPremium, 5);
+                    const locked = isCaseLocked(c, cases, isPremium);
                     return (
                       <div
                         key={c.id}
@@ -207,17 +207,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    Lipa Na M-Pesa • Daraja API
+                    Lipa Na M-Pesa • Lifetime Access
                   </span>
                   <span className="text-xs text-emerald-400 font-semibold">
-                    KES 1,000 Lifetime Pass
+                    KES 1,000 One-time
                   </span>
                 </div>
                 <h3 className="text-lg font-bold text-white mb-1">
                   Unlock Full Access to All {totalCases} Diagnostic Cases
                 </h3>
                 <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-                  You have access to 5 free cases per category. Upgrade now with instant M-Pesa STK push or transaction code verification to unlock all emergency, acute, and complex imaging cases.
+                  Free tier includes {FREE_CXR_LIMIT} Chest X-rays and {FREE_CT_LIMIT} Head CT scans. Unlock all cases permanently and create an account to save your access across all devices.
                 </p>
               </div>
             </div>
@@ -254,7 +254,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   Chest X-ray Case Library
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  PA & Lateral radiographs: Normal variants, lobar pneumonia, pneumothorax, and CHF
+                  PA & Lateral radiographs: Normal variants, lobar pneumonia, pneumothorax, and CHF (First {FREE_CXR_LIMIT} free)
                 </p>
               </div>
             </div>
@@ -294,7 +294,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             {cxrCases.map((c) => {
               const isReviewed = reviewedCases.includes(c.id);
-              const locked = isCaseLocked(c, cases, isPremium, 5);
+              const locked = isCaseLocked(c, cases, isPremium);
 
               return (
                 <div
@@ -389,7 +389,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                   Head CT Case Library
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Non-contrast brain CT: Epidural & subdural hematomas, SAH, MCA infarcts, and skull fractures
+                  Non-contrast brain CT: Epidural & subdural hematomas, SAH, MCA infarcts, and skull fractures (First {FREE_CT_LIMIT} free)
                 </p>
               </div>
             </div>
@@ -429,7 +429,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             {ctCases.map((c) => {
               const isReviewed = reviewedCases.includes(c.id);
-              const locked = isCaseLocked(c, cases, isPremium, 5);
+              const locked = isCaseLocked(c, cases, isPremium);
 
               return (
                 <div

@@ -51,3 +51,16 @@ export interface PaymentConfig {
   paybillOrTillNumber: string;
   accountReference: string;
 }
+
+export interface UserProfile {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  isPremium: boolean;
+  mpesaReceiptNumber?: string;
+  phoneNumber?: string;
+  unlockedAt?: string;
+  provider?: string;
+  createdAt?: string;
+}
+

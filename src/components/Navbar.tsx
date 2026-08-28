@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Stethoscope, Menu, Moon, Sun, ShieldCheck, Smartphone, Sparkles } from 'lucide-react';
-import { ActiveView, Modality } from '../types';
+import { Stethoscope, Menu, Moon, Sun, ShieldCheck, Smartphone, User, LogIn } from 'lucide-react';
+import { ActiveView, Modality, UserProfile } from '../types';
 import { SidebarMenu } from './SidebarMenu';
 
 interface NavbarProps {
@@ -14,6 +14,8 @@ interface NavbarProps {
   totalCount: number;
   isPremium: boolean;
   onOpenPaymentModal: () => void;
+  currentUser: UserProfile | null;
+  onOpenAuthModal: (tab?: 'login' | 'register') => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -25,6 +27,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   totalCount,
   isPremium,
   onOpenPaymentModal,
+  currentUser,
+  onOpenAuthModal,
 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -65,11 +69,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* Right: Quick actions (M-Pesa button, Dark mode toggle & Review badge) */}
-          <div className="flex items-center gap-3">
+          {/* Right: Quick actions (M-Pesa button, User Account / Login, Dark mode toggle & Review badge) */}
+          <div className="flex items-center gap-2.5 sm:gap-3">
             {isPremium ? (
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 text-xs font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
-                <ShieldCheck className="w-4 h-4" />
+              <div 
+                onClick={() => onOpenAuthModal('login')}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950 text-xs font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 cursor-pointer hover:bg-emerald-200 dark:hover:bg-emerald-900 transition-colors"
+                title="Lifetime Pro Active • Click to manage account"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span className="hidden sm:inline">Pro Active</span>
               </div>
             ) : (
@@ -83,17 +91,38 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300">
+            {/* Account / Login Button */}
+            {currentUser ? (
+              <button
+                onClick={() => onOpenAuthModal('login')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
+                title={`Logged in as ${currentUser.displayName || currentUser.email}`}
+              >
+                <User className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span className="hidden md:inline truncate max-w-[120px]">{currentUser.displayName || currentUser.email?.split('@')[0]}</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => onOpenAuthModal('login')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors cursor-pointer"
+                title="Log In or Create Account for Lifetime Access"
+              >
+                <LogIn className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
+                <span className="hidden sm:inline">Log In</span>
+              </button>
+            )}
+
+            <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300">
               <span>{reviewedCount}/{totalCount} Reviewed</span>
             </div>
 
             <button
               onClick={() => setDarkMode(!darkMode)}
-              className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
               title="Toggle Dark Mode"
               aria-label="Toggle Dark Mode"
             >
-              {darkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />}
+              {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
             </button>
           </div>
         </div>
@@ -111,9 +140,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         totalCount={totalCount}
         isPremium={isPremium}
         onOpenPaymentModal={onOpenPaymentModal}
+        currentUser={currentUser}
+        onOpenAuthModal={onOpenAuthModal}
       />
     </>
   );
 };
+
 
 

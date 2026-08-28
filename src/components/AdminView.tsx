@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { researchCaseWithAI, batchResearchCasesWithAI } from '../services/aiAgentService';
 import { fetchPaymentConfig, testPalPlussApi, updatePaymentConfig } from '../services/paymentService';
+import { verifyAdminPassword, updateAdminPassword } from '../services/adminAuthService';
 
 interface AdminViewProps {
   cases: MedicalCase[];
@@ -59,10 +60,23 @@ export const AdminView: React.FC<AdminViewProps> = ({
     return sessionStorage.getItem('rad_admin_auth') === 'true';
   });
   const [passwordInput, setPasswordInput] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState(false);
 
-  // Active Admin Tab: 'ai-agent' | 'manual' | 'automation' | 'payment'
-  const [activeTab, setActiveTab] = useState<'ai-agent' | 'manual' | 'automation' | 'payment'>('ai-agent');
+  // Active Admin Tab: 'ai-agent' | 'manual' | 'automation' | 'payment' | 'security'
+  const [activeTab, setActiveTab] = useState<'ai-agent' | 'manual' | 'automation' | 'payment' | 'security'>('ai-agent');
+
+  // --- ADMIN PASSWORD CHANGE STATE ---
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [currentPasswordInput, setCurrentPasswordInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [changePasswordError, setChangePasswordError] = useState('');
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
 
   // --- PAYMENT / PALPLUSS GATEWAY CONFIG STATE ---
   const [paymentConfigState, setPaymentConfigState] = useState<PaymentConfig>({
@@ -187,20 +201,81 @@ export const AdminView: React.FC<AdminViewProps> = ({
   
   const [successMessage, setSuccessMessage] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput === 'admin123' || passwordInput === 'rad2026') {
-      setIsAuthenticated(true);
-      sessionStorage.setItem('rad_admin_auth', 'true');
-      setLoginError(false);
-    } else {
+    if (!passwordInput.trim()) {
       setLoginError(true);
+      return;
+    }
+    setIsLoggingIn(true);
+    setLoginError(false);
+    try {
+      const isValid = await verifyAdminPassword(passwordInput);
+      if (isValid) {
+        setIsAuthenticated(true);
+        sessionStorage.setItem('rad_admin_auth', 'true');
+        setPasswordInput('');
+        setLoginError(false);
+      } else {
+        setLoginError(true);
+      }
+    } catch {
+      setLoginError(true);
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
     sessionStorage.removeItem('rad_admin_auth');
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setChangePasswordError('');
+    setChangePasswordSuccess('');
+
+    if (!currentPasswordInput.trim()) {
+      setChangePasswordError('Please enter your current admin password.');
+      return;
+    }
+
+    if (!newPasswordInput.trim()) {
+      setChangePasswordError('Please enter a new password.');
+      return;
+    }
+
+    if (newPasswordInput.length < 6) {
+      setChangePasswordError('New password must be at least 6 characters long.');
+      return;
+    }
+
+    if (newPasswordInput !== confirmPasswordInput) {
+      setChangePasswordError('New passwords do not match. Please re-enter.');
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    try {
+      const res = await updateAdminPassword(currentPasswordInput, newPasswordInput);
+      if (res.success) {
+        setChangePasswordSuccess(res.message || 'Admin password updated successfully!');
+        setCurrentPasswordInput('');
+        setNewPasswordInput('');
+        setConfirmPasswordInput('');
+        setTimeout(() => {
+          setChangePasswordSuccess('');
+          setIsChangePasswordOpen(false);
+        }, 3000);
+      } else {
+        setChangePasswordError(res.error || 'Failed to update admin password.');
+      }
+    } catch (err: any) {
+      setChangePasswordError(err?.message || 'Error occurred while updating admin password.');
+    } finally {
+      setIsUpdatingPassword(false);
+    }
   };
 
   // Upload scan file for AI Analysis
@@ -611,42 +686,58 @@ export const AdminView: React.FC<AdminViewProps> = ({
             <div className="w-16 h-16 bg-blue-100 dark:bg-blue-950/80 rounded-2xl mx-auto flex items-center justify-center text-blue-600 dark:text-blue-400 mb-4 shadow-inner">
               <Lock className="w-8 h-8" />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Admin Portal Login</h2>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Admin Terminal Login</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               Enter admin password to research, generate, upload, and manage radiology cases.
             </p>
-            <div className="mt-2 text-xs bg-slate-100 dark:bg-slate-800 py-1.5 px-3 rounded-lg text-slate-600 dark:text-slate-300 inline-block font-mono">
-              Demo Password: <span className="font-bold text-blue-600 dark:text-blue-400">admin123</span>
-            </div>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
-                Password
+                Administrator Password
               </label>
-              <input
-                type="password"
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="Enter admin123"
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                autoFocus
-              />
+              <div className="relative">
+                <input
+                  type={showLoginPassword ? 'text' : 'password'}
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="Enter admin password"
+                  className="w-full pl-4 pr-11 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowLoginPassword(!showLoginPassword)}
+                  className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  tabIndex={-1}
+                >
+                  {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             {loginError && (
               <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400 text-xs bg-rose-50 dark:bg-rose-950/50 p-3 rounded-xl">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                <span>Incorrect password. Please try "admin123".</span>
+                <span>Incorrect password. Please verify your credentials and try again.</span>
               </div>
             )}
 
             <button
               type="submit"
-              className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-lg transition-all text-sm flex items-center justify-center gap-2"
+              disabled={isLoggingIn}
+              className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-semibold shadow-lg transition-all text-sm flex items-center justify-center gap-2 cursor-pointer"
             >
-              <ShieldCheck className="w-5 h-5" /> Sign In to Admin Panel
+              {isLoggingIn ? (
+                <>
+                  <RefreshCw className="w-5 h-5 animate-spin" /> Verifying...
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-5 h-5" /> Sign In to Admin Panel
+                </>
+              )}
             </button>
           </form>
 
@@ -684,16 +775,27 @@ export const AdminView: React.FC<AdminViewProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => {
+              setIsChangePasswordOpen(true);
+              setChangePasswordError('');
+              setChangePasswordSuccess('');
+            }}
+            className="px-4 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 text-xs font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-colors flex items-center gap-2 cursor-pointer border border-amber-200 dark:border-amber-800/80 shadow-sm"
+            title="Change Admin Password"
+          >
+            <Key className="w-4 h-4 text-amber-600 dark:text-amber-400" /> Change Password
+          </button>
           <button
             onClick={onBackToHome}
-            className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2"
+            className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" /> Back to App
           </button>
           <button
             onClick={handleLogout}
-            className="px-4 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 text-xs font-semibold hover:bg-rose-100 transition-colors flex items-center gap-2"
+            className="px-4 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 text-xs font-semibold hover:bg-rose-100 transition-colors flex items-center gap-2 cursor-pointer"
           >
             <LogOut className="w-4 h-4" /> Logout
           </button>
@@ -748,6 +850,16 @@ export const AdminView: React.FC<AdminViewProps> = ({
           }`}
         >
           <Smartphone className="w-4 h-4" /> PalPluss M-Pesa Gateway
+        </button>
+        <button
+          onClick={() => setActiveTab('security')}
+          className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'security'
+              ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Key className="w-4 h-4" /> Security & Password
         </button>
       </div>
 
@@ -2174,6 +2286,135 @@ export const AdminView: React.FC<AdminViewProps> = ({
               </div>
             </div>
           )}
+
+          {/* --- TAB 5: SECURITY & ADMIN PASSWORD --- */}
+          {activeTab === 'security' && (
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-xl border border-slate-200 dark:border-slate-800 space-y-6">
+              <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Admin Security & Password</h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Manage your administrator credentials and access security for this terminal.
+                  </p>
+                </div>
+              </div>
+
+              {changePasswordSuccess && (
+                <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600" />
+                  <span>{changePasswordSuccess}</span>
+                </div>
+              )}
+
+              {changePasswordError && (
+                <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-600" />
+                  <span>{changePasswordError}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleChangePassword} className="space-y-4 max-w-lg">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Current Admin Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassword ? 'text' : 'password'}
+                      value={currentPasswordInput}
+                      onChange={(e) => setCurrentPasswordInput(e.target.value)}
+                      placeholder="Enter current password"
+                      className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-amber-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      tabIndex={-1}
+                    >
+                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    New Admin Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPasswordInput}
+                      onChange={(e) => setNewPasswordInput(e.target.value)}
+                      placeholder="Enter new password (min. 6 characters)"
+                      className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-amber-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      tabIndex={-1}
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Choose a strong password with letters, numbers, and symbols.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Confirm New Password
+                  </label>
+                  <input
+                    type="password"
+                    value={confirmPasswordInput}
+                    onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                    placeholder="Re-type new password"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-amber-500"
+                  />
+                  {newPasswordInput && confirmPasswordInput && (
+                    <div className="mt-1 text-[11px]">
+                      {newPasswordInput === confirmPasswordInput ? (
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Passwords match
+                        </span>
+                      ) : (
+                        <span className="text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1">
+                          <X className="w-3 h-3" /> Passwords do not match
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isUpdatingPassword || !newPasswordInput || newPasswordInput !== confirmPasswordInput}
+                    className="px-6 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-bold shadow-md flex items-center gap-2 transition-all cursor-pointer"
+                  >
+                    {isUpdatingPassword ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    Update Admin Password
+                  </button>
+                </div>
+              </form>
+
+              {/* Security Storage Info Card */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-emerald-500" /> Password Synchronization
+                </h4>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Your updated admin password is automatically synchronized with your Cloud Firestore security configuration (<code className="font-mono text-amber-600 dark:text-amber-400">/settings/admin</code>) and cached locally so you can securely log in from any authorized device.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Column: Live Library Inventory */}
@@ -2226,7 +2467,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => handleStartEdit(c)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors cursor-pointer"
                       title="Edit Case"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
@@ -2238,7 +2479,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           if (editingCaseId === c.id) handleCancelEdit();
                         }
                       }}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors"
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-colors cursor-pointer"
                       title="Delete Case"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -2251,6 +2492,140 @@ export const AdminView: React.FC<AdminViewProps> = ({
         </div>
 
       </div>
+
+      {/* --- CHANGE PASSWORD MODAL --- */}
+      {isChangePasswordOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-6 animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 dark:text-white">Change Admin Password</h3>
+                  <p className="text-[11px] text-slate-500">Update your administrator credentials</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsChangePasswordOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {changePasswordSuccess && (
+              <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-600" />
+                <span>{changePasswordSuccess}</span>
+              </div>
+            )}
+
+            {changePasswordError && (
+              <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-600" />
+                <span>{changePasswordError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Current Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showCurrentPassword ? 'text' : 'password'}
+                    value={currentPasswordInput}
+                    onChange={(e) => setCurrentPasswordInput(e.target.value)}
+                    placeholder="Enter your current password"
+                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-amber-500"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    tabIndex={-1}
+                  >
+                    {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  New Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newPasswordInput}
+                    onChange={(e) => setNewPasswordInput(e.target.value)}
+                    placeholder="Enter new password (min. 6 characters)"
+                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-amber-500"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    tabIndex={-1}
+                  >
+                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  value={confirmPasswordInput}
+                  onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                  placeholder="Re-type new password"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-amber-500"
+                  required
+                />
+                {newPasswordInput && confirmPasswordInput && (
+                  <div className="mt-1 text-[11px]">
+                    {newPasswordInput === confirmPasswordInput ? (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Passwords match
+                      </span>
+                    ) : (
+                      <span className="text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1">
+                        <X className="w-3 h-3" /> Passwords do not match
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsChangePasswordOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingPassword || !newPasswordInput || newPasswordInput !== confirmPasswordInput}
+                  className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-bold shadow-md flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  {isUpdatingPassword ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Save New Password
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

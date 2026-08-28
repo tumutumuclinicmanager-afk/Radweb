@@ -15,7 +15,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { MedicalCase, Modality, Category } from '../types';
-import { isCaseLocked, getCaseCategoryIndex } from '../services/paymentService';
+import { isCaseLocked, getCaseCategoryIndex, FREE_CXR_LIMIT, FREE_CT_LIMIT } from '../services/paymentService';
 
 interface CarouselViewProps {
   cases: MedicalCase[];
@@ -76,7 +76,7 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
   };
 
   // Count locked cases in current view
-  const lockedCountInView = filteredCases.filter(c => isCaseLocked(c, cases, isPremium, 5)).length;
+  const lockedCountInView = filteredCases.filter(c => isCaseLocked(c, cases, isPremium)).length;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -96,7 +96,7 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
               </span>
             ) : (
               <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
-                5 Free Cases / Category
+                {selectedModality === 'chest_xray' ? `${FREE_CXR_LIMIT} Free CXR Cases` : `${FREE_CT_LIMIT} Free Head CT Cases`}
               </span>
             )}
           </div>
@@ -147,10 +147,10 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
             </div>
             <div>
               <h4 className="text-sm font-bold text-emerald-200">
-                Lipa Na M-Pesa • Unlock All {cases.length} Radiology Cases
+                Lipa Na M-Pesa • Lifetime Access to All {cases.length} Radiology Cases
               </h4>
               <p className="text-xs text-slate-300">
-                You are currently exploring 5 free cases per category. Pay KES 1,000 via Safaricom M-Pesa for lifetime unrestricted access.
+                Free tier includes {FREE_CXR_LIMIT} Chest X-rays & {FREE_CT_LIMIT} Head CT scans. Pay KES 1,000 via Safaricom M-Pesa once for permanent lifetime access.
               </p>
             </div>
           </div>
@@ -240,7 +240,7 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
           >
             {filteredCases.map((c, idx) => {
               const isReviewed = reviewedCases.includes(c.id);
-              const locked = isCaseLocked(c, cases, isPremium, 5);
+              const locked = isCaseLocked(c, cases, isPremium);
               const { indexInCategory } = getCaseCategoryIndex(c, cases);
 
               return (
