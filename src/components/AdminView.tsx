@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { MedicalCase, Modality } from '../types';
+import React, { useState, useEffect } from 'react';
+import { MedicalCase, Modality, PaymentConfig, PaymentProvider } from '../types';
 import { 
   Lock, 
   ShieldCheck, 
@@ -33,9 +33,14 @@ import {
   Key,
   FileJson,
   Eye,
-  EyeOff
+  EyeOff,
+  Smartphone,
+  CreditCard,
+  Sliders,
+  Wallet
 } from 'lucide-react';
 import { researchCaseWithAI, batchResearchCasesWithAI } from '../services/aiAgentService';
+import { fetchPaymentConfig, testPalPlussApi, updatePaymentConfig } from '../services/paymentService';
 
 interface AdminViewProps {
   cases: MedicalCase[];
@@ -56,8 +61,42 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState(false);
 
-  // Active Admin Tab: 'ai-agent' | 'manual' | 'automation'
-  const [activeTab, setActiveTab] = useState<'ai-agent' | 'manual' | 'automation'>('ai-agent');
+  // Active Admin Tab: 'ai-agent' | 'manual' | 'automation' | 'payment'
+  const [activeTab, setActiveTab] = useState<'ai-agent' | 'manual' | 'automation' | 'payment'>('ai-agent');
+
+  // --- PAYMENT / PALPLUSS GATEWAY CONFIG STATE ---
+  const [paymentConfigState, setPaymentConfigState] = useState<PaymentConfig>({
+    freeCasesLimit: 5,
+    premiumPriceKes: 1000,
+    activeProvider: 'palpluss',
+    palplussApiKey: '',
+    palplussChannelId: '',
+    darajaEnvironment: 'sandbox',
+    darajaBusinessShortcode: '174379',
+    paybillOrTillNumber: '174379',
+    accountReference: 'RadMed Pro',
+  });
+  const [palplussApiKeyInput, setPalplussApiKeyInput] = useState<string>('');
+  const [palplussChannelInput, setPalplussChannelInput] = useState<string>('');
+  const [priceKesInput, setPriceKesInput] = useState<number>(1000);
+  const [freeLimitInput, setFreeLimitInput] = useState<number>(5);
+  const [providerInput, setProviderInput] = useState<PaymentProvider>('palpluss');
+  const [isSavingPayment, setIsSavingPayment] = useState<boolean>(false);
+  const [isTestingPalpluss, setIsTestingPalpluss] = useState<boolean>(false);
+  const [palplussTestResult, setPalplussTestResult] = useState<any | null>(null);
+  const [paymentNoticeMsg, setPaymentNoticeMsg] = useState<string>('');
+
+  useEffect(() => {
+    fetchPaymentConfig().then((cfg) => {
+      if (cfg) {
+        setPaymentConfigState(cfg);
+        setPriceKesInput(cfg.premiumPriceKes || 1000);
+        setFreeLimitInput(cfg.freeCasesLimit || 5);
+        setProviderInput(cfg.activeProvider || 'palpluss');
+        if (cfg.palplussChannelId) setPalplussChannelInput(cfg.palplussChannelId);
+      }
+    });
+  }, []);
 
   // --- AUTOMATION / N8N STATE ---
   const [apiSecretKey] = useState<string>('radmed_admin_secret_key_2026');
@@ -496,7 +535,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
           },
           {
             parameters: {
-              model: "gemini-2.5-flash",
+              model: "gemini-3.7-flash",
               prompt: "Select a high-yield clinical emergency radiology topic, such as Tension Pneumothorax, Epidural Hematoma, or Aortic Dissection."
             },
             name: "AI Clinical Topic Selector",
@@ -669,10 +708,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
       )}
 
       {/* Main Mode Navigation Tabs */}
-      <div className="flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-fit">
+      <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-fit">
         <button
           onClick={() => setActiveTab('ai-agent')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'ai-agent'
               ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -682,7 +721,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
         </button>
         <button
           onClick={() => setActiveTab('manual')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'manual'
               ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -692,13 +731,23 @@ export const AdminView: React.FC<AdminViewProps> = ({
         </button>
         <button
           onClick={() => setActiveTab('automation')}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+          className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'automation'
               ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
           <Cpu className="w-4 h-4" /> API & n8n Automation
+        </button>
+        <button
+          onClick={() => setActiveTab('payment')}
+          className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'payment'
+              ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Smartphone className="w-4 h-4" /> PalPluss M-Pesa Gateway
         </button>
       </div>
 
@@ -1881,6 +1930,246 @@ export const AdminView: React.FC<AdminViewProps> = ({
     "category": "Emergency Findings"
   }'`}
                   </pre>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* --- TAB 4: PALPLUSS & M-PESA PAYMENT GATEWAY --- */}
+          {activeTab === 'payment' && (
+            <div className="space-y-6">
+              {/* Header Banner */}
+              <div className="bg-gradient-to-br from-slate-900 via-teal-950 to-slate-900 text-white rounded-3xl p-8 shadow-xl border border-teal-800/40 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                  <Smartphone className="w-48 h-48 text-emerald-400" />
+                </div>
+
+                <div className="relative z-10 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                        <Wallet className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold tracking-tight">PalPluss M-Pesa Gateway</h2>
+                        <p className="text-xs text-slate-300">Fast, developer-friendly Safaricom M-Pesa STK Push API</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-700/60 text-emerald-400 text-xs font-semibold">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      PalPluss Ready • KES {priceKesInput} Price Active
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-slate-300 leading-relaxed max-w-2xl">
+                    Configure your PalPluss API credentials to seamlessly trigger M-Pesa prompts directly to your users' phones without complex Daraja certificates.
+                  </p>
+                </div>
+              </div>
+
+              {/* Status or Alert notice */}
+              {paymentNoticeMsg && (
+                <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 flex items-center gap-3 animate-fade-in shadow-sm text-xs sm:text-sm">
+                  <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-600" />
+                  <span>{paymentNoticeMsg}</span>
+                </div>
+              )}
+
+              {/* Configuration Form */}
+              <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200 dark:border-slate-800 space-y-6">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Sliders className="w-5 h-5 text-emerald-600" /> Payment & Pricing Configuration
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Active Provider */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
+                      Active Payment Engine
+                    </label>
+                    <select
+                      value={providerInput}
+                      onChange={(e) => setProviderInput(e.target.value as PaymentProvider)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="palpluss">PalPluss (M-Pesa API Key - Recommended)</option>
+                      <option value="mpesa_daraja">Safaricom Daraja API Direct</option>
+                      <option value="manual_mpesa">Manual M-Pesa Code Verification Only</option>
+                    </select>
+                  </div>
+
+                  {/* Lifetime Price */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
+                      Lifetime Access Price (KES)
+                    </label>
+                    <input
+                      type="number"
+                      value={priceKesInput}
+                      onChange={(e) => setPriceKesInput(Number(e.target.value))}
+                      placeholder="1000"
+                      min={1}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  {/* Free Cases Limit */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
+                      Free Cases Per Category
+                    </label>
+                    <input
+                      type="number"
+                      value={freeLimitInput}
+                      onChange={(e) => setFreeLimitInput(Number(e.target.value))}
+                      placeholder="5"
+                      min={1}
+                      max={50}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
+                  {/* Account Reference */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
+                      M-Pesa Reference Label
+                    </label>
+                    <input
+                      type="text"
+                      value={paymentConfigState.accountReference || 'RadMed Pro'}
+                      onChange={(e) => setPaymentConfigState(prev => ({ ...prev, accountReference: e.target.value }))}
+                      placeholder="RadMed Pro"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                {/* PalPluss API Key & Channel ID */}
+                <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-1.5">
+                      <Key className="w-4 h-4 text-amber-500" /> PalPluss API Credentials
+                    </h4>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {paymentConfigState.palplussApiKey ? `Key configured (${paymentConfigState.palplussApiKey})` : 'Key not set'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                        PalPluss API Key (Live or Test)
+                      </label>
+                      <input
+                        type="password"
+                        value={palplussApiKeyInput}
+                        onChange={(e) => setPalplussApiKeyInput(e.target.value)}
+                        placeholder="pk_live_... or pk_test_..."
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-mono text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Leave blank to keep existing key from environment.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                        PalPluss Channel ID (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={palplussChannelInput}
+                        onChange={(e) => setPalplussChannelInput(e.target.value)}
+                        placeholder="e.g., ch_123456 or leave blank for default"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm font-mono text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
+                      />
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Optional channel identifier from your PalPluss dashboard.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Actions: Save & Test */}
+                  <div className="flex flex-wrap items-center gap-3 pt-2">
+                    <button
+                      type="button"
+                      disabled={isSavingPayment}
+                      onClick={async () => {
+                        setIsSavingPayment(true);
+                        setPaymentNoticeMsg('');
+                        const res = await updatePaymentConfig({
+                          premiumPriceKes: priceKesInput,
+                          freeCasesLimit: freeLimitInput,
+                          activeProvider: providerInput,
+                          palplussApiKey: palplussApiKeyInput || undefined,
+                          palplussChannelId: palplussChannelInput || undefined,
+                          accountReference: paymentConfigState.accountReference,
+                        });
+                        setIsSavingPayment(false);
+                        if (res.success) {
+                          setPaymentNoticeMsg('Payment settings and PalPluss configuration updated successfully!');
+                          if (res.config) setPaymentConfigState(res.config);
+                          setTimeout(() => setPaymentNoticeMsg(''), 5000);
+                        } else {
+                          setPaymentNoticeMsg(`Error: ${res.error || 'Failed to update'}`);
+                        }
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md flex items-center gap-2 transition-all disabled:opacity-50"
+                    >
+                      {isSavingPayment ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                      Save Payment Settings
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isTestingPalpluss}
+                      onClick={async () => {
+                        setIsTestingPalpluss(true);
+                        setPalplussTestResult(null);
+                        const res = await testPalPlussApi(palplussApiKeyInput || undefined);
+                        setIsTestingPalpluss(false);
+                        setPalplussTestResult(res);
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold shadow-sm flex items-center gap-2 transition-all disabled:opacity-50"
+                    >
+                      {isTestingPalpluss ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                      Test PalPluss API Connection
+                    </button>
+                  </div>
+
+                  {/* Test Result Display */}
+                  {palplussTestResult && (
+                    <div className={`p-4 rounded-2xl text-xs space-y-2 border ${
+                      palplussTestResult.success 
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200' 
+                        : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200'
+                    }`}>
+                      <div className="flex items-center gap-2 font-bold">
+                        {palplussTestResult.success ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                        {palplussTestResult.success ? 'PalPluss Connection Verified!' : 'PalPluss Connection Issue'}
+                      </div>
+                      <p>{palplussTestResult.message || palplussTestResult.error}</p>
+                      {palplussTestResult.data && (
+                        <pre className="p-2.5 rounded-xl bg-black/40 text-emerald-300 font-mono text-[11px] overflow-x-auto">
+                          {JSON.stringify(palplussTestResult.data, null, 2)}
+                        </pre>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Webhook Callback Info */}
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400 space-y-2">
+                  <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider block text-[11px]">
+                    PalPluss Webhook Callback URL:
+                  </span>
+                  <div className="font-mono text-emerald-600 dark:text-emerald-400 bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 break-all select-all">
+                    {typeof window !== 'undefined' ? window.location.origin : 'https://radmed-chi.vercel.app'}/api/payment/palpluss/callback
+                  </div>
+                  <p className="text-[11px]">
+                    PalPluss will post real-time M-Pesa transaction confirmations (payment success, receipts, and user phone numbers) to this endpoint for instant automated library unlocking.
+                  </p>
                 </div>
               </div>
             </div>

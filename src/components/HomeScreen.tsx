@@ -9,13 +9,18 @@ import {
   BookOpen, 
   ShieldAlert, 
   CheckCircle2, 
-  Sparkles,
-  Stethoscope,
-  ChevronLeft,
-  ChevronRight,
-  Eye
+  Sparkles, 
+  Stethoscope, 
+  ChevronLeft, 
+  ChevronRight, 
+  Eye,
+  Lock,
+  Smartphone,
+  ShieldCheck,
+  Zap
 } from 'lucide-react';
 import { ActiveView, Modality, MedicalCase } from '../types';
+import { isCaseLocked } from '../services/paymentService';
 
 interface HomeScreenProps {
   setActiveView: (view: ActiveView) => void;
@@ -23,6 +28,8 @@ interface HomeScreenProps {
   cases: MedicalCase[];
   onSelectCase: (c: MedicalCase) => void;
   reviewedCases: string[];
+  isPremium: boolean;
+  onOpenPaymentModal: (category?: string, caseTitle?: string) => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -31,6 +38,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   cases,
   onSelectCase,
   reviewedCases,
+  isPremium,
+  onOpenPaymentModal,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<MedicalCase[]>([]);
@@ -67,7 +76,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const cxrCases = cases.filter(c => c.modality === 'chest_xray');
   const ctCases = cases.filter(c => c.modality === 'head_ct');
   const reviewedCount = reviewedCases.length;
-  const progressPercent = Math.round((reviewedCount / totalCases) * 100);
+  const progressPercent = totalCases > 0 ? Math.round((reviewedCount / totalCases) * 100) : 0;
+
+  const handleCaseClick = (c: MedicalCase) => {
+    const locked = isCaseLocked(c, cases, isPremium, 5);
+    if (locked) {
+      onOpenPaymentModal(c.category, c.title);
+    } else {
+      onSelectCase(c);
+      setIsSearching(false);
+      setSearchQuery('');
+    }
+  };
 
   return (
     <div className="min-h-[calc(100vh-4rem)] pb-20">
@@ -127,33 +147,46 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     No matching radiology cases found for "{searchQuery}".
                   </div>
                 ) : (
-                  searchResults.map(c => (
-                    <div
-                      key={c.id}
-                      onClick={() => onSelectCase(c)}
-                      className="flex items-center gap-3 p-3 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl cursor-pointer transition-colors"
-                    >
-                      <div className="w-12 h-12 rounded-lg bg-slate-200 dark:bg-slate-800 flex-shrink-0 overflow-hidden">
-                        <img src={c.imageUrl} alt={c.imageAlt} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                            c.modality === 'chest_xray' 
-                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300' 
-                              : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
-                          }`}>
-                            {c.modality === 'chest_xray' ? 'Chest X-ray' : 'Head CT'}
-                          </span>
-                          <span className="text-xs text-slate-500 dark:text-slate-400">• {c.category}</span>
+                  searchResults.map(c => {
+                    const locked = isCaseLocked(c, cases, isPremium, 5);
+                    return (
+                      <div
+                        key={c.id}
+                        onClick={() => handleCaseClick(c)}
+                        className="flex items-center gap-3 p-3 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl cursor-pointer transition-colors"
+                      >
+                        <div className="w-12 h-12 rounded-lg bg-slate-200 dark:bg-slate-800 flex-shrink-0 overflow-hidden relative">
+                          <img src={c.imageUrl} alt={c.imageAlt} className={`w-full h-full object-cover ${locked ? 'blur-xs opacity-60' : ''}`} />
+                          {locked && (
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                              <Lock className="w-3.5 h-3.5 text-amber-300" />
+                            </div>
+                          )}
                         </div>
-                        <h4 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
-                          {c.diagnosis}
-                        </h4>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                              c.modality === 'chest_xray' 
+                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300' 
+                                : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
+                            }`}>
+                              {c.modality === 'chest_xray' ? 'Chest X-ray' : 'Head CT'}
+                            </span>
+                            <span className="text-xs text-slate-500 dark:text-slate-400">• {c.category}</span>
+                            {locked && (
+                              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/80 px-1.5 py-0.2 rounded">
+                                Locked (KES 1,000)
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                            {c.diagnosis}
+                          </h4>
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
                       </div>
-                      <ArrowRight className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             )}
@@ -161,9 +194,54 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </div>
 
-      {/* Main Case Sections */}
+      {/* Main Content Area */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 relative z-20 space-y-12">
         
+        {/* Lipa Na M-Pesa Premium Banner (If Not Paid) */}
+        {!isPremium ? (
+          <div className="p-6 rounded-3xl bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 border border-emerald-500/40 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0 border border-emerald-500/30">
+                <Smartphone className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Lipa Na M-Pesa • Daraja API
+                  </span>
+                  <span className="text-xs text-emerald-400 font-semibold">
+                    KES 1,000 Lifetime Pass
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-white mb-1">
+                  Unlock Full Access to All {totalCases} Diagnostic Cases
+                </h3>
+                <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                  You have access to 5 free cases per category. Upgrade now with instant M-Pesa STK push or transaction code verification to unlock all emergency, acute, and complex imaging cases.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => onOpenPaymentModal()}
+              className="px-6 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-xl shadow-emerald-600/30 flex items-center justify-center gap-2 whitespace-nowrap transition-all flex-shrink-0 cursor-pointer"
+            >
+              <Zap className="w-4 h-4 fill-current" /> Pay KES 1,000 with M-Pesa
+            </button>
+          </div>
+        ) : (
+          <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-sm font-semibold">
+                RadMed Pro Active • All {totalCases} Radiology Cases & Clinical Reporting Templates Unlocked
+              </span>
+            </div>
+            <span className="text-xs font-bold uppercase tracking-wider bg-emerald-200 dark:bg-emerald-900/80 px-2.5 py-1 rounded-md">
+              Lifetime Access
+            </span>
+          </div>
+        )}
+
         {/* --- SECTION 1: CHEST X-RAY CASES --- */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -216,18 +294,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             {cxrCases.map((c) => {
               const isReviewed = reviewedCases.includes(c.id);
+              const locked = isCaseLocked(c, cases, isPremium, 5);
+
               return (
                 <div
                   key={c.id}
-                  onClick={() => onSelectCase(c)}
-                  className="flex-shrink-0 w-80 bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-xl border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 transition-all cursor-pointer snap-center group flex flex-col justify-between"
+                  onClick={() => handleCaseClick(c)}
+                  className={`flex-shrink-0 w-80 bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-xl border transition-all cursor-pointer snap-center group flex flex-col justify-between ${
+                    locked
+                      ? 'border-amber-400/40 dark:border-amber-500/30 hover:border-emerald-500'
+                      : 'border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50'
+                  }`}
                 >
                   <div className="relative h-56 bg-slate-950 overflow-hidden">
                     <img 
                       src={c.imageUrl} 
                       alt={c.imageAlt}
                       onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80'; }}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90" 
+                      className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${
+                        locked ? 'blur-sm opacity-60' : 'opacity-90'
+                      }`} 
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
                     <div className="absolute top-3 left-3 flex items-center gap-2">
@@ -237,18 +323,41 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         {c.category}
                       </span>
                     </div>
-                    {isReviewed && (
+
+                    {locked ? (
+                      <span className="absolute top-3 right-3 bg-amber-500/95 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full backdrop-blur-md flex items-center gap-1 shadow-md">
+                        <Lock className="w-3 h-3" /> Pro
+                      </span>
+                    ) : isReviewed ? (
                       <span className="absolute top-3 right-3 bg-emerald-500/90 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-md">
                         ✓ Reviewed
                       </span>
+                    ) : null}
+
+                    {locked && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center">
+                        <div className="w-10 h-10 rounded-full bg-slate-900/80 border border-amber-400/40 text-amber-400 flex items-center justify-center mb-1 shadow-lg backdrop-blur-md">
+                          <Lock className="w-5 h-5" />
+                        </div>
+                        <span className="text-[11px] font-bold text-white bg-black/60 px-2.5 py-0.5 rounded-full">
+                          Pay KES 1,000
+                        </span>
+                      </div>
                     )}
+
                     <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
                       <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-black/40 backdrop-blur-md">
                         {c.difficulty}
                       </span>
-                      <span className="text-xs bg-blue-600/80 hover:bg-blue-600 px-3 py-1 rounded-lg font-semibold flex items-center gap-1 backdrop-blur-md">
-                        <Eye className="w-3.5 h-3.5" /> Inspect Case
-                      </span>
+                      {locked ? (
+                        <span className="text-xs bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded-lg font-bold flex items-center gap-1 backdrop-blur-md text-white shadow">
+                          <Smartphone className="w-3.5 h-3.5" /> Unlock
+                        </span>
+                      ) : (
+                        <span className="text-xs bg-blue-600/80 hover:bg-blue-600 px-3 py-1 rounded-lg font-semibold flex items-center gap-1 backdrop-blur-md">
+                          <Eye className="w-3.5 h-3.5" /> Inspect Case
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -258,7 +367,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         {c.diagnosis}
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-                        {c.keyFindings[0]}
+                        {locked ? 'Clinical key findings & radiological signs locked. Tap to unlock with M-Pesa.' : c.keyFindings[0]}
                       </p>
                     </div>
                   </div>
@@ -320,18 +429,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             {ctCases.map((c) => {
               const isReviewed = reviewedCases.includes(c.id);
+              const locked = isCaseLocked(c, cases, isPremium, 5);
+
               return (
                 <div
                   key={c.id}
-                  onClick={() => onSelectCase(c)}
-                  className="flex-shrink-0 w-80 bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-xl border border-slate-200/80 dark:border-slate-800 hover:border-indigo-500/50 transition-all cursor-pointer snap-center group flex flex-col justify-between"
+                  onClick={() => handleCaseClick(c)}
+                  className={`flex-shrink-0 w-80 bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-xl border transition-all cursor-pointer snap-center group flex flex-col justify-between ${
+                    locked
+                      ? 'border-amber-400/40 dark:border-amber-500/30 hover:border-emerald-500'
+                      : 'border-slate-200/80 dark:border-slate-800 hover:border-indigo-500/50'
+                  }`}
                 >
                   <div className="relative h-56 bg-slate-950 overflow-hidden">
                     <img 
                       src={c.imageUrl} 
                       alt={c.imageAlt}
                       onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80'; }}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90" 
+                      className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${
+                        locked ? 'blur-sm opacity-60' : 'opacity-90'
+                      }`} 
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
                     <div className="absolute top-3 left-3 flex items-center gap-2">
@@ -341,18 +458,41 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         {c.category}
                       </span>
                     </div>
-                    {isReviewed && (
+
+                    {locked ? (
+                      <span className="absolute top-3 right-3 bg-amber-500/95 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full backdrop-blur-md flex items-center gap-1 shadow-md">
+                        <Lock className="w-3 h-3" /> Pro
+                      </span>
+                    ) : isReviewed ? (
                       <span className="absolute top-3 right-3 bg-emerald-500/90 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-md">
                         ✓ Reviewed
                       </span>
+                    ) : null}
+
+                    {locked && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center">
+                        <div className="w-10 h-10 rounded-full bg-slate-900/80 border border-amber-400/40 text-amber-400 flex items-center justify-center mb-1 shadow-lg backdrop-blur-md">
+                          <Lock className="w-5 h-5" />
+                        </div>
+                        <span className="text-[11px] font-bold text-white bg-black/60 px-2.5 py-0.5 rounded-full">
+                          Pay KES 1,000
+                        </span>
+                      </div>
                     )}
+
                     <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
                       <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-black/40 backdrop-blur-md">
                         {c.difficulty}
                       </span>
-                      <span className="text-xs bg-indigo-600/80 hover:bg-indigo-600 px-3 py-1 rounded-lg font-semibold flex items-center gap-1 backdrop-blur-md">
-                        <Eye className="w-3.5 h-3.5" /> Inspect Case
-                      </span>
+                      {locked ? (
+                        <span className="text-xs bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded-lg font-bold flex items-center gap-1 backdrop-blur-md text-white shadow">
+                          <Smartphone className="w-3.5 h-3.5" /> Unlock
+                        </span>
+                      ) : (
+                        <span className="text-xs bg-indigo-600/80 hover:bg-indigo-600 px-3 py-1 rounded-lg font-semibold flex items-center gap-1 backdrop-blur-md">
+                          <Eye className="w-3.5 h-3.5" /> Inspect Case
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -362,7 +502,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         {c.diagnosis}
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-                        {c.keyFindings[0]}
+                        {locked ? 'Clinical key findings & radiological signs locked. Tap to unlock with M-Pesa.' : c.keyFindings[0]}
                       </p>
                     </div>
                   </div>

@@ -23,12 +23,32 @@
         "galleryImages": { "type": "array", "items": { "type": "object" } }
       },
       "required": ["id", "title", "modality", "category", "imageUrl", "diagnosis"]
+    },
+    "PaymentTransaction": {
+      "title": "PaymentTransaction",
+      "description": "M-Pesa or mobile payment transaction record for unlocking full case access",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "checkoutRequestId": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "amount": { "type": "number" },
+        "mpesaReceiptNumber": { "type": "string" },
+        "status": { "type": "string" },
+        "provider": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "phoneNumber", "amount", "status", "createdAt"]
     }
   },
   "firestore": {
     "/cases/{caseId}": {
       "schema": "MedicalCase",
       "description": "Radiology teaching cases collection"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "PaymentTransaction",
+      "description": "Payment transactions collection"
     }
   }
 }

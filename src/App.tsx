@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ActiveView, Modality, MedicalCase } from './types';
 import { MEDICAL_CASES } from './data/casesData';
 import { fetchCases, addCaseToFirestore, deleteCaseFromFirestore } from './services/casesService';
+import { getIsPremiumStatus, markUserAsPremium } from './services/paymentService';
 import { Navbar } from './components/Navbar';
 import { HomeScreen } from './components/HomeScreen';
 import { CarouselView } from './components/CarouselView';
@@ -10,11 +11,29 @@ import { FlashcardsView } from './components/FlashcardsView';
 import { DisclaimerModal } from './components/DisclaimerModal';
 import { AdminView } from './components/AdminView';
 import { InterpretationView } from './components/InterpretationView';
+import { MpesaPaymentModal } from './components/MpesaPaymentModal';
 
 export default function App() {
   const [activeView, setActiveView] = useState<ActiveView>('home');
   const [selectedModality, setSelectedModality] = useState<Modality>('chest_xray');
   const [cases, setCases] = useState<MedicalCase[]>(MEDICAL_CASES);
+
+  // M-Pesa Premium State
+  const [isPremium, setIsPremium] = useState<boolean>(() => getIsPremiumStatus());
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentModalCategory, setPaymentModalCategory] = useState<string | undefined>(undefined);
+  const [paymentModalTitle, setPaymentModalTitle] = useState<string | undefined>(undefined);
+
+  const handleOpenPaymentModal = (category?: string, caseTitle?: string) => {
+    setPaymentModalCategory(category);
+    setPaymentModalTitle(caseTitle);
+    setPaymentModalOpen(true);
+  };
+
+  const handlePaymentSuccess = () => {
+    markUserAsPremium();
+    setIsPremium(true);
+  };
 
   useEffect(() => {
     fetchCases().then((fetched) => {
@@ -99,6 +118,8 @@ export default function App() {
         setDarkMode={setDarkMode}
         reviewedCount={reviewedCases.length}
         totalCount={cases.length}
+        isPremium={isPremium}
+        onOpenPaymentModal={() => handleOpenPaymentModal()}
       />
 
       {/* Main Views or Full-Page Case View */}
@@ -111,6 +132,8 @@ export default function App() {
             onBack={() => setSelectedCaseForDetail(null)}
             onMarkReviewed={handleMarkReviewed}
             isReviewed={reviewedCases.includes(selectedCaseForDetail.id)}
+            isPremium={isPremium}
+            onOpenPaymentModal={handleOpenPaymentModal}
           />
         ) : (
           <>
@@ -121,6 +144,8 @@ export default function App() {
                 cases={cases}
                 onSelectCase={(c) => setSelectedCaseForDetail(c)}
                 reviewedCases={reviewedCases}
+                isPremium={isPremium}
+                onOpenPaymentModal={handleOpenPaymentModal}
               />
             )}
 
@@ -131,6 +156,8 @@ export default function App() {
                 setSelectedModality={setSelectedModality}
                 onSelectCase={(c) => setSelectedCaseForDetail(c)}
                 reviewedCases={reviewedCases}
+                isPremium={isPremium}
+                onOpenPaymentModal={handleOpenPaymentModal}
               />
             )}
 
@@ -167,6 +194,15 @@ export default function App() {
           </>
         )}
       </main>
+
+      {/* Lipa Na M-Pesa Payment Modal */}
+      <MpesaPaymentModal
+        isOpen={paymentModalOpen}
+        onClose={() => setPaymentModalOpen(false)}
+        onPaymentSuccess={handlePaymentSuccess}
+        selectedCategory={paymentModalCategory}
+        caseTitle={paymentModalTitle}
+      />
 
       {/* Footer */}
       <footer className="py-6 px-4 text-center text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800/60 mt-12">

@@ -9,9 +9,13 @@ import {
   Eye, 
   CheckCircle, 
   Sparkles,
-  Maximize2
+  Maximize2,
+  Lock,
+  Smartphone,
+  ShieldCheck
 } from 'lucide-react';
 import { MedicalCase, Modality, Category } from '../types';
+import { isCaseLocked, getCaseCategoryIndex } from '../services/paymentService';
 
 interface CarouselViewProps {
   cases: MedicalCase[];
@@ -19,6 +23,8 @@ interface CarouselViewProps {
   setSelectedModality: (modality: Modality) => void;
   onSelectCase: (c: MedicalCase) => void;
   reviewedCases: string[];
+  isPremium: boolean;
+  onOpenPaymentModal: (category?: string, caseTitle?: string) => void;
 }
 
 export const CarouselView: React.FC<CarouselViewProps> = ({
@@ -27,6 +33,8 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
   setSelectedModality,
   onSelectCase,
   reviewedCases,
+  isPremium,
+  onOpenPaymentModal,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<Category>('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,6 +75,9 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
     scrollToIndex(newIndex);
   };
 
+  // Count locked cases in current view
+  const lockedCountInView = filteredCases.filter(c => isCaseLocked(c, cases, isPremium, 5)).length;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header & Modality Switcher */}
@@ -79,6 +90,15 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
             <span className="text-xs text-slate-500 dark:text-slate-400">
               {filteredCases.length} Cases Available
             </span>
+            {isPremium ? (
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5" /> RadMed Pro Active
+              </span>
+            ) : (
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                5 Free Cases / Category
+              </span>
+            )}
           </div>
           <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white">
             {selectedModality === 'chest_xray' ? 'Chest X-ray Library' : 'Head CT Library'}
@@ -117,6 +137,31 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Free Tier Notice Banner (if non-premium) */}
+      {!isPremium && (
+        <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-emerald-900/40 via-slate-900/60 to-slate-900/40 border border-emerald-500/30 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
+              <Smartphone className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-emerald-200">
+                Lipa Na M-Pesa • Unlock All {cases.length} Radiology Cases
+              </h4>
+              <p className="text-xs text-slate-300">
+                You are currently exploring 5 free cases per category. Pay KES 1,000 via Safaricom M-Pesa for lifetime unrestricted access.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => onOpenPaymentModal(selectedCategory, undefined)}
+            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 whitespace-nowrap transition-all"
+          >
+            <Sparkles className="w-4 h-4" /> Unlock All with M-Pesa
+          </button>
+        </div>
+      )}
 
       {/* Filters & Search Bar Row */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8 bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
@@ -195,11 +240,24 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
           >
             {filteredCases.map((c, idx) => {
               const isReviewed = reviewedCases.includes(c.id);
+              const locked = isCaseLocked(c, cases, isPremium, 5);
+              const { indexInCategory } = getCaseCategoryIndex(c, cases);
+
               return (
                 <div
                   key={c.id}
-                  onClick={() => onSelectCase(c)}
-                  className="flex-shrink-0 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-lg border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 dark:hover:border-blue-500/50 transition-all duration-300 cursor-pointer snap-center group flex flex-col justify-between"
+                  onClick={() => {
+                    if (locked) {
+                      onOpenPaymentModal(c.category, c.title);
+                    } else {
+                      onSelectCase(c);
+                    }
+                  }}
+                  className={`flex-shrink-0 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-lg border transition-all duration-300 cursor-pointer snap-center group flex flex-col justify-between ${
+                    locked
+                      ? 'border-amber-400/40 dark:border-amber-500/30 hover:border-emerald-500 shadow-amber-500/5'
+                      : 'border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 dark:hover:border-blue-500/50'
+                  }`}
                 >
                   {/* Image Header with Badge */}
                   <div className="relative h-64 bg-slate-900 overflow-hidden">
@@ -207,7 +265,9 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
                       src={c.imageUrl} 
                       alt={c.imageAlt}
                       onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80'; }}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90 group-hover:opacity-100" 
+                      className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${
+                        locked ? 'blur-sm opacity-60' : 'opacity-90 group-hover:opacity-100'
+                      }`} 
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
 
@@ -223,21 +283,47 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
                         {c.category}
                       </span>
 
-                      {isReviewed && (
+                      {locked ? (
+                        <span className="flex items-center gap-1 bg-amber-500/95 text-slate-950 text-xs font-extrabold px-2.5 py-1 rounded-full backdrop-blur-md shadow-md">
+                          <Lock className="w-3.5 h-3.5" /> Premium
+                        </span>
+                      ) : isReviewed ? (
                         <span className="flex items-center gap-1 bg-emerald-500/90 text-white text-xs font-semibold px-2.5 py-1 rounded-full backdrop-blur-md shadow-md">
                           <CheckCircle className="w-3.5 h-3.5" /> Reviewed
                         </span>
+                      ) : (
+                        <span className="text-[11px] font-semibold bg-blue-600/80 text-white px-2 py-0.5 rounded-full backdrop-blur-md">
+                          Free Case #{indexInCategory}
+                        </span>
                       )}
                     </div>
+
+                    {/* Locked Center Overlay */}
+                    {locked && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center z-10">
+                        <div className="w-12 h-12 rounded-full bg-slate-900/80 border border-amber-400/40 text-amber-400 flex items-center justify-center mb-2 shadow-xl backdrop-blur-md">
+                          <Lock className="w-6 h-6" />
+                        </div>
+                        <span className="text-xs font-bold text-white uppercase tracking-wider bg-black/60 px-3 py-1 rounded-full backdrop-blur-md">
+                          Unlock Case with M-Pesa
+                        </span>
+                      </div>
+                    )}
 
                     {/* Bottom overlay badge */}
                     <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
                       <span className="text-xs font-medium px-2.5 py-1 rounded-lg bg-black/40 backdrop-blur-md">
                         Case {idx + 1} of {filteredCases.length}
                       </span>
-                      <span className="text-xs bg-blue-600/80 hover:bg-blue-600 px-3 py-1 rounded-lg font-semibold flex items-center gap-1 backdrop-blur-md transition-colors">
-                        <Eye className="w-3.5 h-3.5" /> View Case
-                      </span>
+                      {locked ? (
+                        <span className="text-xs bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded-lg font-bold flex items-center gap-1 backdrop-blur-md transition-colors text-white shadow-md">
+                          <Smartphone className="w-3.5 h-3.5" /> Pay with M-Pesa
+                        </span>
+                      ) : (
+                        <span className="text-xs bg-blue-600/80 hover:bg-blue-600 px-3 py-1 rounded-lg font-semibold flex items-center gap-1 backdrop-blur-md transition-colors">
+                          <Eye className="w-3.5 h-3.5" /> View Case
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -248,18 +334,27 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
                         <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
                           {c.modality === 'chest_xray' ? 'Chest X-ray' : 'Head CT'} • {c.difficulty}
                         </span>
+                        {locked && (
+                          <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                            KES 200 Lifetime Pass
+                          </span>
+                        )}
                       </div>
                       <h3 className="font-bold text-lg text-slate-900 dark:text-white mb-2 line-clamp-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                         {c.diagnosis}
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-4">
-                        {c.keyFindings[0]}
+                        {locked ? 'Detailed key findings, clinical significance, and reporting template locked. Tap to unlock via M-Pesa.' : c.keyFindings[0]}
                       </p>
                     </div>
 
                     <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                      <span>Click to open detail view</span>
-                      <Maximize2 className="w-4 h-4 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                      <span>{locked ? 'Tap to pay via M-Pesa' : 'Click to open detail view'}</span>
+                      {locked ? (
+                        <Lock className="w-4 h-4 text-amber-500 group-hover:text-emerald-500 transition-colors" />
+                      ) : (
+                        <Maximize2 className="w-4 h-4 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -271,3 +366,4 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
     </div>
   );
 };
+

@@ -15,9 +15,14 @@ import {
   Images,
   ZoomIn,
   Maximize2,
-  X
+  X,
+  Lock,
+  Smartphone,
+  ShieldCheck,
+  Zap
 } from 'lucide-react';
 import { MedicalCase } from '../types';
+import { isCaseLocked, getCaseCategoryIndex } from '../services/paymentService';
 
 interface CaseDetailViewProps {
   currentCase: MedicalCase;
@@ -26,6 +31,8 @@ interface CaseDetailViewProps {
   onBack: () => void;
   onMarkReviewed: (id: string) => void;
   isReviewed: boolean;
+  isPremium: boolean;
+  onOpenPaymentModal: (category?: string, caseTitle?: string) => void;
 }
 
 export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
@@ -35,13 +42,19 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
   onBack,
   onMarkReviewed,
   isReviewed,
+  isPremium,
+  onOpenPaymentModal,
 }) => {
   const [activeTab, setActiveTab] = useState<'findings' | 'clinical' | 'reporting' | 'teaching' | 'gallery'>('findings');
   const [copied, setCopied] = useState(false);
 
+  const isLocked = isCaseLocked(currentCase, allCases, isPremium, 5);
+  const { indexInCategory, totalInCategory } = getCaseCategoryIndex(currentCase, allCases);
+
   // Gallery image selection state
   const [selectedImgUrl, setSelectedImgUrl] = useState<string>(currentCase.imageUrl);
   const [selectedCaption, setSelectedCaption] = useState<string>(currentCase.imageAlt);
+
 
   // Lightbox zoom modal state
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -446,10 +459,50 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                 </div>
 
                 {/* Tab Contents */}
-                <div className="flex-1 space-y-6">
-                  
-                  {/* Findings Tab */}
-                  {activeTab === 'findings' && (
+                <div className="flex-1 space-y-6 relative">
+                  {isLocked ? (
+                    <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/70 border border-amber-400/40 text-white shadow-2xl text-center space-y-5">
+                      <div className="w-16 h-16 rounded-3xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto border border-amber-400/30 shadow-lg">
+                        <Lock className="w-8 h-8" />
+                      </div>
+
+                      <div className="max-w-md mx-auto space-y-2">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-400/30">
+                          <Lock className="w-3.5 h-3.5" /> Premium Case #{indexInCategory} of {totalInCategory}
+                        </div>
+                        <h2 className="text-xl sm:text-2xl font-extrabold text-white">
+                          Unlock Diagnosis & Reporting Template
+                        </h2>
+                        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                          This case is outside your 5 free tier cases in <strong>{currentCase.category}</strong>. Unlock complete radiologist findings, teaching points, differential diagnoses, and standardized templates with M-Pesa.
+                        </p>
+                      </div>
+
+                      <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                        <button
+                          onClick={() => onOpenPaymentModal(currentCase.category, currentCase.title)}
+                          className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-xl shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                        >
+                          <Smartphone className="w-4 h-4" /> Pay KES 1,000 via M-Pesa
+                        </button>
+                        <button
+                          onClick={() => onOpenPaymentModal(currentCase.category, currentCase.title)}
+                          className="w-full sm:w-auto px-5 py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition-all border border-slate-700 cursor-pointer"
+                        >
+                          Enter Transaction Code
+                        </button>
+                      </div>
+
+                      <div className="pt-2 text-[11px] text-slate-400 flex items-center justify-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                        <span>Instant automated STK Push via Safaricom Daraja API</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Findings Tab */}
+                      {activeTab === 'findings' && (
+
                     <div className="space-y-6 animate-fadeIn">
                       <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60">
                         <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block mb-1">
@@ -590,6 +643,8 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                         ))}
                       </div>
                     </div>
+                  )}
+                    </>
                   )}
 
                 </div>

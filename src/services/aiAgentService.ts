@@ -16,10 +16,36 @@ export interface BatchResearchParams {
   modality?: Modality;
 }
 
-const RADIOLOGY_IMAGES: Record<Modality, string> = {
+const RADIOLOGY_IMAGES: Record<string, string> = {
   chest_xray: 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&q=80&w=1200',
+  chest_pneumothorax: 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?auto=format&fit=crop&q=80&w=1200',
+  chest_pneumonia: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?auto=format&fit=crop&q=80&w=1200',
   head_ct: 'https://images.unsplash.com/photo-1559757175-5700dde675bc?auto=format&fit=crop&q=80&w=1200',
+  head_hemorrhage: 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?auto=format&fit=crop&q=80&w=1200',
+  head_mri_ct: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?auto=format&fit=crop&q=80&w=1200',
 };
+
+function getBestRadiologyImageUrl(prompt: string, modality: Modality): string {
+  const p = (prompt || '').toLowerCase();
+  if (modality === 'head_ct') {
+    if (p.includes('hemorrhage') || p.includes('bleed') || p.includes('hematoma') || p.includes('subdural') || p.includes('epidural')) {
+      return RADIOLOGY_IMAGES.head_hemorrhage;
+    }
+    if (p.includes('infarct') || p.includes('stroke') || p.includes('mca') || p.includes('tumor')) {
+      return RADIOLOGY_IMAGES.head_mri_ct;
+    }
+    return RADIOLOGY_IMAGES.head_ct;
+  }
+
+  // Chest X-ray
+  if (p.includes('pneumothorax') || p.includes('tension') || p.includes('air') || p.includes('pleural')) {
+    return RADIOLOGY_IMAGES.chest_pneumothorax;
+  }
+  if (p.includes('pneumonia') || p.includes('consolidation') || p.includes('infiltrate') || p.includes('effusion') || p.includes('edema')) {
+    return RADIOLOGY_IMAGES.chest_pneumonia;
+  }
+  return RADIOLOGY_IMAGES.chest_xray;
+}
 
 // Client-Side Clinical Case Synthesis Engine (Activated if backend API proxy is offline or static)
 function synthesizeClientMedicalCase(params: ResearchCaseParams): MedicalCase {
@@ -36,7 +62,7 @@ function synthesizeClientMedicalCase(params: ResearchCaseParams): MedicalCase {
       : `data:${params.mimeType || 'image/jpeg'};base64,${params.imageBase64}`;
   }
   if (!imageUrl) {
-    imageUrl = RADIOLOGY_IMAGES[modality];
+    imageUrl = getBestRadiologyImageUrl(prompt, modality);
   }
 
   return {

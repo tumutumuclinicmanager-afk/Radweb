@@ -1,5 +1,5 @@
 import React from 'react';
-import { Stethoscope, BookOpen, Layers, Moon, Sun, Home, ShieldAlert, Lock, X, CheckCircle2 } from 'lucide-react';
+import { Stethoscope, BookOpen, Layers, Moon, Sun, Home, ShieldAlert, Lock, X, CheckCircle2, Smartphone, ShieldCheck, Zap } from 'lucide-react';
 import { ActiveView } from '../types';
 
 interface SidebarMenuProps {
@@ -11,6 +11,8 @@ interface SidebarMenuProps {
   setDarkMode: (val: boolean) => void;
   reviewedCount: number;
   totalCount: number;
+  isPremium: boolean;
+  onOpenPaymentModal: () => void;
 }
 
 export const SidebarMenu: React.FC<SidebarMenuProps> = ({
@@ -22,6 +24,8 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
   setDarkMode,
   reviewedCount,
   totalCount,
+  isPremium,
+  onOpenPaymentModal,
 }) => {
   const progressPercentage = Math.round((reviewedCount / totalCount) * 100) || 0;
 
@@ -125,6 +129,34 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
             <ShieldAlert className="w-5 h-5" />
             <span>Clinical Disclaimer & Info</span>
           </button>
+
+          {/* M-Pesa Premium status box in sidebar */}
+          <div className="pt-2">
+            {!isPremium ? (
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950 via-slate-900 to-slate-900 border border-emerald-500/40 text-white">
+                <div className="flex items-center gap-2 mb-2">
+                  <Smartphone className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">
+                    Lipa Na M-Pesa
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 mb-3 leading-relaxed">
+                  5 free cases per category. Pay <strong>KES 1,000</strong> once for lifetime unlimited access.
+                </p>
+                <button
+                  onClick={() => { onClose(); onOpenPaymentModal(); }}
+                  className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Zap className="w-3.5 h-3.5 fill-current" /> Pay KES 1,000
+                </button>
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 flex items-center gap-2.5 text-xs font-semibold">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                <span>RadMed Pro • Lifetime Access</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Sidebar Footer / Stats & Theme */}
@@ -147,7 +179,7 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
             </div>
           </div>
 
-          {/* Theme Toggle & Credits */}
+          {/* Theme Toggle */}
           <div className="flex items-center justify-between pt-2">
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Dark Appearance</span>
             <button
@@ -165,3 +197,4 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
     </div>
   );
 };
+

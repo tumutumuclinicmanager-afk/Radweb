@@ -22,3 +22,32 @@ export interface MedicalCase {
 }
 
 export type ActiveView = 'home' | 'cases' | 'flashcards' | 'disclaimer' | 'quiz' | 'admin' | 'interpretation';
+
+export type PaymentProvider = 'palpluss' | 'mpesa_daraja' | 'manual_mpesa' | 'paystack' | 'stripe';
+
+export interface PaymentTransaction {
+  id: string;
+  checkoutRequestId?: string;
+  merchantRequestId?: string;
+  phoneNumber: string;
+  amount: number;
+  currency: string;
+  mpesaReceiptNumber?: string;
+  status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+  provider: PaymentProvider;
+  resultDesc?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface PaymentConfig {
+  freeCasesLimit: number;
+  premiumPriceKes: number;
+  activeProvider: PaymentProvider;
+  palplussApiKey?: string;
+  palplussChannelId?: string;
+  darajaEnvironment: 'sandbox' | 'production';
+  darajaBusinessShortcode: string;
+  paybillOrTillNumber: string;
+  accountReference: string;
+}
