@@ -141,10 +141,8 @@ export default function App() {
   const handleAddCase = async (newCase: MedicalCase) => {
     try {
       await addCaseToFirestore(newCase);
-      setCases((prev) => {
-        const filtered = prev.filter(c => c.id !== newCase.id);
-        return [newCase, ...filtered];
-      });
+      const refreshed = await fetchCases();
+      setCases(sortCasesDeterministically(refreshed));
     } catch (err) {
       console.error(err);
       alert('Failed to save case to Firebase database.');
@@ -154,7 +152,8 @@ export default function App() {
   const handleDeleteCase = async (id: string) => {
     try {
       await deleteCaseFromFirestore(id);
-      setCases((prev) => prev.filter((c) => c.id !== id));
+      const refreshed = await fetchCases();
+      setCases(sortCasesDeterministically(refreshed));
     } catch (err) {
       console.error(err);
       alert('Failed to delete case from Firebase database.');

@@ -109,52 +109,28 @@ export function addDiagnosticLog(
 /**
  * Deterministic Sorting Algorithm:
  * Guarantees that regardless of network latency, Firestore partition return order,
- * or browser reload sequence, cases are ALWAYS returned in the exact same deterministic order:
- * 1. Curated baseline cases (1-20) maintain their natural canonical sequence
- * 2. Explicit orderIndex values are respected
- * 3. Custom / Admin-published cases follow deterministically by creation time or ID
+ * or browser reload sequence, cases are ALWAYS returned in a stable sequence:
+ * 1. Explicit orderIndex values are respected first
+ * 2. Next, sorted chronologically by createdAt timestamp
+ * 3. Fallback to deterministic string ID comparison
  */
 export function sortCasesDeterministically(cases: MedicalCase[]): MedicalCase[] {
   return [...cases].sort((a, b) => {
-    const aBaselineOrder = BASELINE_ORDER_MAP.get(a.id);
-    const bBaselineOrder = BASELINE_ORDER_MAP.get(b.id);
-
-    // If both are baseline cases, use baseline canonical order (1..20)
-    if (aBaselineOrder !== undefined && bBaselineOrder !== undefined) {
-      return aBaselineOrder - bBaselineOrder;
-    }
-
-    // If one is baseline and the other is custom, baseline comes first (unless explicit orderIndex overrides)
-    if (aBaselineOrder !== undefined && bBaselineOrder === undefined) {
-      const aOrder = a.orderIndex !== undefined ? a.orderIndex : aBaselineOrder;
-      const bOrder = b.orderIndex !== undefined ? b.orderIndex : 9999;
-      if (aOrder !== bOrder) return aOrder - bOrder;
-      return -1;
-    }
-
-    if (aBaselineOrder === undefined && bBaselineOrder !== undefined) {
-      const aOrder = a.orderIndex !== undefined ? a.orderIndex : 9999;
-      const bOrder = b.orderIndex !== undefined ? b.orderIndex : bBaselineOrder;
-      if (aOrder !== bOrder) return aOrder - bOrder;
-      return 1;
-    }
-
-    // If both are custom cases:
-    // First compare orderIndex if present
+    // 1. Explicit orderIndex
     if (a.orderIndex !== undefined && b.orderIndex !== undefined && a.orderIndex !== b.orderIndex) {
       return a.orderIndex - b.orderIndex;
     }
     if (a.orderIndex !== undefined && b.orderIndex === undefined) return -1;
     if (a.orderIndex === undefined && b.orderIndex !== undefined) return 1;
 
-    // Then compare createdAt timestamps if present
+    // 2. CreatedAt timestamps
     const aCreated = typeof a.createdAt === 'number' ? a.createdAt : typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : 0;
     const bCreated = typeof b.createdAt === 'number' ? b.createdAt : typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : 0;
     if (aCreated !== bCreated && aCreated > 0 && bCreated > 0) {
       return aCreated - bCreated;
     }
 
-    // Fallback to deterministic string ID comparison
+    // 3. Fallback to string ID comparison
     return a.id.localeCompare(b.id);
   });
 }
@@ -280,41 +256,37 @@ export async function fetchCases(): Promise<MedicalCase[]> {
   diagnosticState.localCacheCount = localCustomCases.length;
   diagnosticState.staticSeedCount = MEDICAL_CASES.length;
 
-  // Single Authoritative Merge Matrix
-  const combinedMap = new Map<string, MedicalCase>();
-  
-  // 1. Seed baseline 20 curated cases first with standard orderIndex
-  for (let i = 0; i < MEDICAL_CASES.length; i++) {
-    const base = { ...MEDICAL_CASES[i], orderIndex: i + 1 };
-    combinedMap.set(base.id, base);
+  let finalCases: MedicalCase[] = [];
+
+  if (remoteFetchSuccess) {
+    if (remoteCases.length > 0) {
+      // Remote Firestore is the pure authoritative source of truth
+      finalCases = remoteCases;
+    } else {
+      // Remote collection is empty
+      if (localCustomCases.length > 0) {
+        finalCases = localCustomCases;
+      } else {
+        // First-run bootstrap only: Seed initial starter cases into Firestore
+        addDiagnosticLog('info', 'sync', 'Firestore collection is empty on first run. Initializing starter cases to Firestore...');
+        const seedResult = await reseedFirestoreWithBaselineCases();
+        if (seedResult.success) {
+          finalCases = MEDICAL_CASES.map((c, i) => ({ ...c, orderIndex: i + 1 }));
+        } else {
+          finalCases = MEDICAL_CASES;
+        }
+      }
+    }
+  } else {
+    // Offline fallback: Use local storage cache if available
+    finalCases = localCustomCases.length > 0 ? localCustomCases : MEDICAL_CASES;
   }
 
-  // 2. If remote fetch succeeded, overlay remote cases
-  if (remoteFetchSuccess && remoteCases.length > 0) {
-    for (const c of remoteCases) {
-      const existing = combinedMap.get(c.id);
-      combinedMap.set(c.id, {
-        ...existing,
-        ...c,
-        orderIndex: c.orderIndex ?? existing?.orderIndex,
-      });
-    }
-  } else if (!remoteFetchSuccess && localCustomCases.length > 0) {
-    // If offline, overlay local cache items
-    for (const c of localCustomCases) {
-      const existing = combinedMap.get(c.id);
-      combinedMap.set(c.id, {
-        ...existing,
-        ...c,
-      });
-    }
-  }
-
-  // 3. Apply Deterministic Sorting
-  const sortedCases = sortCasesDeterministically(Array.from(combinedMap.values()));
+  // Apply Deterministic & Stable Sorting
+  const sortedCases = sortCasesDeterministically(finalCases);
   const now = Date.now();
 
-  // 4. Update local storage so offline cache exactly mirrors authoritative state
+  // Update local storage cache to strictly mirror authoritative state
   try {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sortedCases));
     diagnosticState.localCacheCount = sortedCases.length;
@@ -325,20 +297,16 @@ export async function fetchCases(): Promise<MedicalCase[]> {
   diagnosticState.lastSuccessfulSyncTimestamp = now;
   diagnosticState.lastSuccessfulSyncIso = new Date(now).toISOString();
   diagnosticState.lastSyncCaseCount = sortedCases.length;
-  diagnosticState.hasFallbackSeedProtected = sortedCases.length >= MEDICAL_CASES.length;
-  diagnosticState.lastSyncSource = remoteFetchSuccess && remoteCases.length > 0 ? 'firestore' : 'merged';
+  diagnosticState.hasFallbackSeedProtected = sortedCases.length > 0;
+  diagnosticState.lastSyncSource = remoteFetchSuccess && remoteCases.length > 0 ? 'firestore' : 'local-storage';
 
-  addDiagnosticLog('success', 'sync', `Deterministic sync complete: ${sortedCases.length} cases locked in stable sequence.`, {
+  addDiagnosticLog('success', 'sync', `Sync complete: ${sortedCases.length} cases loaded from Firestore.`, {
     rawTimestamp: now,
     isoTimestamp: diagnosticState.lastSuccessfulSyncIso,
     durationMs: now - syncStartTime,
-    breakdown: {
-      staticBaselineSeed: MEDICAL_CASES.length,
-      remoteFirestore: remoteCases.length,
-      localCache: localCustomCases.length,
-      finalTotalInState: sortedCases.length,
-    },
-    deterministicSortApplied: true,
+    source: diagnosticState.lastSyncSource,
+    remoteCount: remoteCases.length,
+    finalTotalInState: sortedCases.length,
   });
 
   notifySubscribers();
@@ -349,10 +317,10 @@ export async function addCaseToFirestore(newCase: MedicalCase): Promise<void> {
   const caseToSave: MedicalCase = {
     ...newCase,
     createdAt: newCase.createdAt || Date.now(),
-    orderIndex: newCase.orderIndex ?? (100 + (diagnosticState.lastSyncCaseCount || 20)),
+    orderIndex: newCase.orderIndex ?? Date.now(),
   };
 
-  addDiagnosticLog('info', 'sync', `Saving case "${caseToSave.title}" (ID: ${caseToSave.id})...`);
+  addDiagnosticLog('info', 'sync', `Saving case "${caseToSave.title}" (ID: ${caseToSave.id}) to Firestore...`);
 
   // Always update local cache immediately
   try {
