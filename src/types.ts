@@ -18,6 +18,8 @@ export interface MedicalCase {
   teachingPoints: string[];
   cmeTip: string;
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+  orderIndex?: number;
+  createdAt?: number | string;
   galleryImages?: { url: string; caption: string }[];
 }
 

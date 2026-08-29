@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ActiveView, Modality, MedicalCase, UserProfile } from './types';
 import { MEDICAL_CASES } from './data/casesData';
-import { fetchCases, addCaseToFirestore, deleteCaseFromFirestore } from './services/casesService';
+import { fetchCases, addCaseToFirestore, deleteCaseFromFirestore, sortCasesDeterministically } from './services/casesService';
 import { getIsPremiumStatus, markUserAsPremium, clearPremiumStatus } from './services/paymentService';
 import { subscribeToAuth, updateUserPremiumStatusInFirestore } from './services/authService';
 import { Navbar } from './components/Navbar';
@@ -18,7 +18,7 @@ import { AuthModal } from './components/AuthModal';
 export default function App() {
   const [activeView, setActiveView] = useState<ActiveView>('home');
   const [selectedModality, setSelectedModality] = useState<Modality>('chest_xray');
-  const [cases, setCases] = useState<MedicalCase[]>(MEDICAL_CASES);
+  const [cases, setCases] = useState<MedicalCase[]>(() => sortCasesDeterministically(MEDICAL_CASES));
 
   // User Authentication & Lifetime Pro Access State
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
@@ -91,8 +91,8 @@ export default function App() {
 
   const handleRefreshCases = async () => {
     const fetched = await fetchCases();
-    const unique = Array.from(new Map(fetched.map(c => [c.id, c])).values());
-    setCases(unique);
+    const sorted = sortCasesDeterministically(fetched);
+    setCases(sorted);
   };
 
   useEffect(() => {

@@ -45,6 +45,7 @@ import { researchCaseWithAI, batchResearchCasesWithAI } from '../services/aiAgen
 import { fetchPaymentConfig, testPalPlussApi, updatePaymentConfig } from '../services/paymentService';
 import { verifyAdminPassword, updateAdminPassword } from '../services/adminAuthService';
 import { DiagnosticPanel } from './DiagnosticPanel';
+import { DatabaseTerminal } from './DatabaseTerminal';
 import { getSafeImageUrl, handleImageError, compressAndReadImageFile } from '../lib/imageUtils';
 
 interface AdminViewProps {
@@ -70,8 +71,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState(false);
 
-  // Active Admin Tab: 'ai-agent' | 'manual' | 'automation' | 'payment' | 'security' | 'diagnostics'
-  const [activeTab, setActiveTab] = useState<'ai-agent' | 'manual' | 'automation' | 'payment' | 'security' | 'diagnostics'>('ai-agent');
+  // Active Admin Tab: 'ai-agent' | 'manual' | 'automation' | 'payment' | 'security' | 'diagnostics' | 'terminal'
+  const [activeTab, setActiveTab] = useState<'ai-agent' | 'manual' | 'automation' | 'payment' | 'security' | 'diagnostics' | 'terminal'>('ai-agent');
 
   // --- ADMIN PASSWORD CHANGE STATE ---
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
@@ -863,6 +864,16 @@ export const AdminView: React.FC<AdminViewProps> = ({
           }`}
         >
           <Key className="w-4 h-4" /> Security & Password
+        </button>
+        <button
+          onClick={() => setActiveTab('terminal')}
+          className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'terminal'
+              ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Terminal className="w-4 h-4" /> Database Terminal & CLI
         </button>
         <button
           onClick={() => setActiveTab('diagnostics')}
@@ -2479,7 +2490,15 @@ export const AdminView: React.FC<AdminViewProps> = ({
             </div>
           )}
 
-          {/* --- TAB 6: SYSTEM & SYNC DIAGNOSTICS --- */}
+          {/* --- TAB 6: DATABASE TERMINAL & CLI SHELL --- */}
+          {activeTab === 'terminal' && (
+            <DatabaseTerminal
+              cases={cases}
+              onRefreshCases={onRefreshCases || (async () => {})}
+            />
+          )}
+
+          {/* --- TAB 7: SYSTEM & SYNC DIAGNOSTICS --- */}
           {activeTab === 'diagnostics' && (
             <DiagnosticPanel
               cases={cases}

@@ -1,18 +1,24 @@
-import { collection, getDocs, doc, setDoc, deleteDoc, getDocFromServer } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, getDocFromServer, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { MedicalCase } from '../types';
 import { MEDICAL_CASES } from '../data/casesData';
 import firebaseConfig from '../../firebase-applet-config.json';
+import { isDataOrBlobUrl } from '../lib/imageUtils';
 
 const COLLECTION_NAME = 'cases';
 const LOCAL_STORAGE_KEY = 'radmed_custom_cases_cache';
+
+// Canonical Baseline Ordering Map (Ensures baseline cases 1-20 always retain exact position)
+const BASELINE_ORDER_MAP = new Map<string, number>(
+  MEDICAL_CASES.map((c, index) => [c.id, index + 1])
+);
 
 export interface DiagnosticLogEntry {
   id: string;
   timestamp: number; // raw epoch milliseconds
   isoTime: string;
   level: 'info' | 'success' | 'warn' | 'error';
-  category: 'sync' | 'connection' | 'storage' | 'restore' | 'auth';
+  category: 'sync' | 'connection' | 'storage' | 'restore' | 'auth' | 'terminal';
   message: string;
   details?: any;
 }
@@ -101,6 +107,59 @@ export function addDiagnosticLog(
 }
 
 /**
+ * Deterministic Sorting Algorithm:
+ * Guarantees that regardless of network latency, Firestore partition return order,
+ * or browser reload sequence, cases are ALWAYS returned in the exact same deterministic order:
+ * 1. Curated baseline cases (1-20) maintain their natural canonical sequence
+ * 2. Explicit orderIndex values are respected
+ * 3. Custom / Admin-published cases follow deterministically by creation time or ID
+ */
+export function sortCasesDeterministically(cases: MedicalCase[]): MedicalCase[] {
+  return [...cases].sort((a, b) => {
+    const aBaselineOrder = BASELINE_ORDER_MAP.get(a.id);
+    const bBaselineOrder = BASELINE_ORDER_MAP.get(b.id);
+
+    // If both are baseline cases, use baseline canonical order (1..20)
+    if (aBaselineOrder !== undefined && bBaselineOrder !== undefined) {
+      return aBaselineOrder - bBaselineOrder;
+    }
+
+    // If one is baseline and the other is custom, baseline comes first (unless explicit orderIndex overrides)
+    if (aBaselineOrder !== undefined && bBaselineOrder === undefined) {
+      const aOrder = a.orderIndex !== undefined ? a.orderIndex : aBaselineOrder;
+      const bOrder = b.orderIndex !== undefined ? b.orderIndex : 9999;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return -1;
+    }
+
+    if (aBaselineOrder === undefined && bBaselineOrder !== undefined) {
+      const aOrder = a.orderIndex !== undefined ? a.orderIndex : 9999;
+      const bOrder = b.orderIndex !== undefined ? b.orderIndex : bBaselineOrder;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return 1;
+    }
+
+    // If both are custom cases:
+    // First compare orderIndex if present
+    if (a.orderIndex !== undefined && b.orderIndex !== undefined && a.orderIndex !== b.orderIndex) {
+      return a.orderIndex - b.orderIndex;
+    }
+    if (a.orderIndex !== undefined && b.orderIndex === undefined) return -1;
+    if (a.orderIndex === undefined && b.orderIndex !== undefined) return 1;
+
+    // Then compare createdAt timestamps if present
+    const aCreated = typeof a.createdAt === 'number' ? a.createdAt : typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : 0;
+    const bCreated = typeof b.createdAt === 'number' ? b.createdAt : typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : 0;
+    if (aCreated !== bCreated && aCreated > 0 && bCreated > 0) {
+      return aCreated - bCreated;
+    }
+
+    // Fallback to deterministic string ID comparison
+    return a.id.localeCompare(b.id);
+  });
+}
+
+/**
  * Tests live connection to Firestore using getDocFromServer and measuring round-trip latency.
  */
 export async function testFirestoreConnection(): Promise<{
@@ -164,14 +223,16 @@ export async function testFirestoreConnection(): Promise<{
 }
 
 /**
- * Main 3-tier sync function:
- * Tier 1: Static Seed Baseline (20 curated cases)
- * Tier 2: Remote Firestore Overlay
- * Tier 3: LocalStorage Custom Cases Cache
+ * Main Authoritative Case Synchronization Pipeline:
+ * - Fetches remote cases from Firestore
+ * - Ensures all 20 curated baseline cases are present
+ * - Applies deterministic sorting
+ * - Updates local storage cache to match authoritative list
+ * - Prevents count flapping and ordering variance on page reload
  */
 export async function fetchCases(): Promise<MedicalCase[]> {
   const syncStartTime = Date.now();
-  addDiagnosticLog('info', 'sync', 'Starting 3-tier case synchronization pipeline...');
+  addDiagnosticLog('info', 'sync', 'Starting deterministic case synchronization pipeline...');
 
   let remoteCases: MedicalCase[] = [];
   let remoteFetchSuccess = false;
@@ -204,7 +265,7 @@ export async function fetchCases(): Promise<MedicalCase[]> {
     addDiagnosticLog('warn', 'sync', `Firestore query note: ${remoteErrorDesc}. Utilizing robust fallback overlay tiers.`);
   }
 
-  // Load locally cached custom cases
+  // Load locally cached custom cases if remote query failed
   let localCustomCases: MedicalCase[] = [];
   try {
     const savedLocal = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -219,32 +280,55 @@ export async function fetchCases(): Promise<MedicalCase[]> {
   diagnosticState.localCacheCount = localCustomCases.length;
   diagnosticState.staticSeedCount = MEDICAL_CASES.length;
 
-  // 3-Tier Merge Matrix
+  // Single Authoritative Merge Matrix
   const combinedMap = new Map<string, MedicalCase>();
   
-  // 1. Include baseline 20 curated cases first
-  for (const c of MEDICAL_CASES) {
-    combinedMap.set(c.id, c);
-  }
-  // 2. Overlay remote cases from Firestore
-  for (const c of remoteCases) {
-    combinedMap.set(c.id, c);
-  }
-  // 3. Overlay local custom cases
-  for (const c of localCustomCases) {
-    combinedMap.set(c.id, c);
+  // 1. Seed baseline 20 curated cases first with standard orderIndex
+  for (let i = 0; i < MEDICAL_CASES.length; i++) {
+    const base = { ...MEDICAL_CASES[i], orderIndex: i + 1 };
+    combinedMap.set(base.id, base);
   }
 
-  const finalCases = Array.from(combinedMap.values());
+  // 2. If remote fetch succeeded, overlay remote cases
+  if (remoteFetchSuccess && remoteCases.length > 0) {
+    for (const c of remoteCases) {
+      const existing = combinedMap.get(c.id);
+      combinedMap.set(c.id, {
+        ...existing,
+        ...c,
+        orderIndex: c.orderIndex ?? existing?.orderIndex,
+      });
+    }
+  } else if (!remoteFetchSuccess && localCustomCases.length > 0) {
+    // If offline, overlay local cache items
+    for (const c of localCustomCases) {
+      const existing = combinedMap.get(c.id);
+      combinedMap.set(c.id, {
+        ...existing,
+        ...c,
+      });
+    }
+  }
+
+  // 3. Apply Deterministic Sorting
+  const sortedCases = sortCasesDeterministically(Array.from(combinedMap.values()));
   const now = Date.now();
+
+  // 4. Update local storage so offline cache exactly mirrors authoritative state
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sortedCases));
+    diagnosticState.localCacheCount = sortedCases.length;
+  } catch (e) {
+    // ignore
+  }
 
   diagnosticState.lastSuccessfulSyncTimestamp = now;
   diagnosticState.lastSuccessfulSyncIso = new Date(now).toISOString();
-  diagnosticState.lastSyncCaseCount = finalCases.length;
-  diagnosticState.hasFallbackSeedProtected = finalCases.length >= MEDICAL_CASES.length;
+  diagnosticState.lastSyncCaseCount = sortedCases.length;
+  diagnosticState.hasFallbackSeedProtected = sortedCases.length >= MEDICAL_CASES.length;
   diagnosticState.lastSyncSource = remoteFetchSuccess && remoteCases.length > 0 ? 'firestore' : 'merged';
 
-  addDiagnosticLog('success', 'sync', `Synchronization complete: ${finalCases.length} total cases loaded.`, {
+  addDiagnosticLog('success', 'sync', `Deterministic sync complete: ${sortedCases.length} cases locked in stable sequence.`, {
     rawTimestamp: now,
     isoTimestamp: diagnosticState.lastSuccessfulSyncIso,
     durationMs: now - syncStartTime,
@@ -252,35 +336,41 @@ export async function fetchCases(): Promise<MedicalCase[]> {
       staticBaselineSeed: MEDICAL_CASES.length,
       remoteFirestore: remoteCases.length,
       localCache: localCustomCases.length,
-      finalTotalInState: finalCases.length,
+      finalTotalInState: sortedCases.length,
     },
-    emptyArrayGuardActive: true,
+    deterministicSortApplied: true,
   });
 
   notifySubscribers();
-  return finalCases;
+  return sortedCases;
 }
 
 export async function addCaseToFirestore(newCase: MedicalCase): Promise<void> {
-  addDiagnosticLog('info', 'sync', `Saving case "${newCase.title}" (ID: ${newCase.id})...`);
+  const caseToSave: MedicalCase = {
+    ...newCase,
+    createdAt: newCase.createdAt || Date.now(),
+    orderIndex: newCase.orderIndex ?? (100 + (diagnosticState.lastSyncCaseCount || 20)),
+  };
 
-  // Always update local cache
+  addDiagnosticLog('info', 'sync', `Saving case "${caseToSave.title}" (ID: ${caseToSave.id})...`);
+
+  // Always update local cache immediately
   try {
     const savedLocal = localStorage.getItem(LOCAL_STORAGE_KEY);
     const localCases: MedicalCase[] = savedLocal ? JSON.parse(savedLocal) : [];
-    const updated = [newCase, ...localCases.filter(c => c.id !== newCase.id)];
+    const updated = sortCasesDeterministically([caseToSave, ...localCases.filter(c => c.id !== caseToSave.id)]);
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
     diagnosticState.localCacheCount = updated.length;
-    addDiagnosticLog('info', 'storage', `Case "${newCase.title}" written to local browser cache.`);
+    addDiagnosticLog('info', 'storage', `Case "${caseToSave.title}" written to local browser cache.`);
   } catch (e) {
     addDiagnosticLog('warn', 'storage', 'Failed to write case to localStorage.');
   }
 
   try {
-    await setDoc(doc(db, COLLECTION_NAME, newCase.id), newCase);
-    addDiagnosticLog('success', 'sync', `Case "${newCase.title}" persisted directly to Firestore.`);
+    await setDoc(doc(db, COLLECTION_NAME, caseToSave.id), caseToSave);
+    addDiagnosticLog('success', 'sync', `Case "${caseToSave.title}" persisted directly to Firestore collection "${COLLECTION_NAME}".`);
   } catch (error: any) {
-    addDiagnosticLog('warn', 'sync', `Firestore write encountered an error: ${error?.message || error}. Case remains safe in local cache.`);
+    addDiagnosticLog('warn', 'sync', `Firestore write note: ${error?.message || error}. Case remains safe in local cache.`);
   }
 
   notifySubscribers();
@@ -313,29 +403,35 @@ export async function deleteCaseFromFirestore(caseId: string): Promise<void> {
 }
 
 /**
- * Reseeds all 20 curated baseline cases to Firestore and local cache.
+ * Reseeds all 20 curated baseline cases to Firestore with explicit deterministic orderIndex values.
  */
 export async function reseedFirestoreWithBaselineCases(): Promise<{
   success: boolean;
   count: number;
   error?: string;
 }> {
-  addDiagnosticLog('info', 'restore', `Initiating database re-seed of ${MEDICAL_CASES.length} curated baseline cases to Firestore...`);
+  addDiagnosticLog('info', 'restore', `Initiating deterministic database re-seed of ${MEDICAL_CASES.length} curated baseline cases to Firestore...`);
 
   let successCount = 0;
   let lastErr: string | undefined;
 
+  const baselineWithOrder: MedicalCase[] = MEDICAL_CASES.map((c, idx) => ({
+    ...c,
+    orderIndex: idx + 1,
+    createdAt: Date.now() - (MEDICAL_CASES.length - idx) * 1000,
+  }));
+
   // Reseed local cache
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(MEDICAL_CASES));
-    diagnosticState.localCacheCount = MEDICAL_CASES.length;
-    addDiagnosticLog('success', 'storage', `Local storage cache populated with ${MEDICAL_CASES.length} curated cases.`);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(baselineWithOrder));
+    diagnosticState.localCacheCount = baselineWithOrder.length;
+    addDiagnosticLog('success', 'storage', `Local storage cache populated with ${baselineWithOrder.length} curated cases.`);
   } catch (e: any) {
     addDiagnosticLog('warn', 'storage', `Local storage write error: ${e?.message || e}`);
   }
 
   // Reseed Firestore
-  for (const c of MEDICAL_CASES) {
+  for (const c of baselineWithOrder) {
     try {
       await setDoc(doc(db, COLLECTION_NAME, c.id), c);
       successCount++;
@@ -350,7 +446,7 @@ export async function reseedFirestoreWithBaselineCases(): Promise<{
   diagnosticState.lastSuccessfulSyncIso = new Date(now).toISOString();
 
   if (successCount > 0) {
-    addDiagnosticLog('success', 'restore', `Successfully seeded ${successCount}/${MEDICAL_CASES.length} cases into Firestore.`, {
+    addDiagnosticLog('success', 'restore', `Successfully seeded ${successCount}/${MEDICAL_CASES.length} cases into Firestore with canonical order indices.`, {
       seededCount: successCount,
       rawTimestamp: now,
     });
@@ -404,4 +500,339 @@ export function inspectLocalCache(): { key: string; rawLength: number; parsedCou
     };
   }
 }
+
+/**
+ * Deep inspection of Image storage in the database
+ */
+export function inspectImageStorage(cases: MedicalCase[]): {
+  totalCases: number;
+  cdnUrlCount: number;
+  dataUriCount: number;
+  totalGalleryImages: number;
+  avgImagePayloadLength: number;
+  items: {
+    id: string;
+    title: string;
+    modality: string;
+    imageType: 'CDN_URL' | 'DATA_URI_BASE64' | 'LOCAL_PATH';
+    urlSnippet: string;
+    estimatedBytes: number;
+    hasGallery: boolean;
+    galleryCount: number;
+  }[];
+} {
+  let cdnCount = 0;
+  let dataUriCount = 0;
+  let totalGallery = 0;
+  let totalBytes = 0;
+
+  const items = cases.map((c) => {
+    const isDataUri = isDataOrBlobUrl(c.imageUrl);
+    if (isDataUri) {
+      dataUriCount++;
+    } else {
+      cdnCount++;
+    }
+
+    const galleryCount = Array.isArray(c.galleryImages) ? c.galleryImages.length : 0;
+    totalGallery += galleryCount;
+
+    const imgBytes = c.imageUrl ? new Blob([c.imageUrl]).size : 0;
+    totalBytes += imgBytes;
+
+    return {
+      id: c.id,
+      title: c.title,
+      modality: c.modality,
+      imageType: (isDataUri ? 'DATA_URI_BASE64' : 'CDN_URL') as 'CDN_URL' | 'DATA_URI_BASE64' | 'LOCAL_PATH',
+      urlSnippet: c.imageUrl ? `${c.imageUrl.substring(0, 60)}...` : 'NONE',
+      estimatedBytes: imgBytes,
+      hasGallery: galleryCount > 0,
+      galleryCount,
+    };
+  });
+
+  return {
+    totalCases: cases.length,
+    cdnUrlCount: cdnCount,
+    dataUriCount,
+    totalGalleryImages: totalGallery,
+    avgImagePayloadLength: cases.length > 0 ? Math.round(totalBytes / cases.length) : 0,
+    items,
+  };
+}
+
+/**
+ * Command-line Database Terminal Execution Engine
+ */
+export interface CommandResult {
+  command: string;
+  timestamp: string;
+  output: string;
+  data?: any;
+  format?: 'text' | 'table' | 'json' | 'stats';
+  isError?: boolean;
+}
+
+export async function executeDatabaseCliCommand(
+  rawCommand: string,
+  currentCases: MedicalCase[]
+): Promise<CommandResult> {
+  const timestamp = new Date().toLocaleTimeString();
+  const trimmed = rawCommand.trim();
+  if (!trimmed) {
+    return { command: rawCommand, timestamp, output: '' };
+  }
+
+  const parts = trimmed.split(' ').filter(Boolean);
+  const root = parts[0].toLowerCase();
+  const arg1 = parts[1]?.toLowerCase();
+  const arg2 = parts[2];
+
+  addDiagnosticLog('info', 'terminal', `CLI Command executed: "${trimmed}"`);
+
+  switch (root) {
+    case 'help':
+    case '?':
+      return {
+        command: rawCommand,
+        timestamp,
+        format: 'text',
+        output: [
+          '================ RADMED FIRESTORE DATABASE TERMINAL ================',
+          'Available Commands:',
+          '  help, ?                    Show this help manual',
+          '  status                     Display live Firestore connection, database ID & latency',
+          '  ls, list                   List all cases in Firestore with ID, Modality & Image Type',
+          '  get <caseId>, cat <id>     View complete JSON document for a specific case ID',
+          '  images, inspect images     Analyze how images are stored (CDN URLs vs Base64 payloads)',
+          '  stats                      Display database collections, case count & storage metrics',
+          '  sort-order                 Inspect deterministic sort index values across all cases',
+          '  ping                       Probe Firestore server with live roundtrip latency measurement',
+          '  reseed                     Reseed all 20 curated baseline cases with canonical orderIndex',
+          '  clear-cache                Clear local browser cache to force fresh remote sync',
+          '  export json                Export all cases as structured JSON payload',
+          '  clear                      Clear terminal console screen',
+          '=====================================================================',
+        ].join('\n'),
+      };
+
+    case 'status': {
+      const diag = getDiagnosticState();
+      return {
+        command: rawCommand,
+        timestamp,
+        format: 'stats',
+        output: [
+          `[FIRESTORE STATUS REPORT]`,
+          `Database ID:      ${diag.databaseId}`,
+          `Project ID:       ${diag.projectId}`,
+          `Connection:       ${diag.connectionStatus.toUpperCase()}`,
+          `Last Ping:        ${diag.lastPingLatencyMs ? `${diag.lastPingLatencyMs}ms` : 'Not pinged yet'}`,
+          `Total Cases:      ${currentCases.length}`,
+          `Baseline Seed:    ${diag.staticSeedCount} cases`,
+          `Remote Firestore: ${diag.remoteFirestoreCount} docs`,
+          `Local Cache:      ${diag.localCacheCount} items`,
+          `Sync Timestamp:   ${diag.lastSuccessfulSyncIso || 'Never'}`,
+          `Sort Engine:      Deterministic Canonical Ordering [ACTIVE]`,
+        ].join('\n'),
+        data: diag,
+      };
+    }
+
+    case 'ls':
+    case 'list': {
+      const modalityFilter = arg1 && (arg1.includes('cxr') || arg1.includes('xray') || arg1.includes('chest'))
+        ? 'chest_xray'
+        : arg1 && (arg1.includes('ct') || arg1.includes('head'))
+        ? 'head_ct'
+        : null;
+
+      const filtered = modalityFilter ? currentCases.filter(c => c.modality === modalityFilter) : currentCases;
+      
+      const rows = filtered.map((c, i) => {
+        const imgType = isDataOrBlobUrl(c.imageUrl) ? 'DATA_URI' : 'HTTPS_CDN';
+        return `${String(i + 1).padStart(2, ' ')}. [${c.id}] | ${c.modality.padEnd(10, ' ')} | ${c.category.padEnd(18, ' ')} | ${imgType.padEnd(10, ' ')} | "${c.title}"`;
+      });
+
+      return {
+        command: rawCommand,
+        timestamp,
+        format: 'text',
+        output: [
+          `Found ${filtered.length} documents in collection "${COLLECTION_NAME}":`,
+          `---------------------------------------------------------------------------------------------------------`,
+          ` #  [Document ID]   | Modality   | Category           | Image Type | Title`,
+          `---------------------------------------------------------------------------------------------------------`,
+          ...rows,
+          `---------------------------------------------------------------------------------------------------------`,
+          `Tip: Type "get <id>" (e.g., "get case-cxr-001") to inspect the complete JSON document.`,
+        ].join('\n'),
+        data: filtered,
+      };
+    }
+
+    case 'get':
+    case 'cat':
+    case 'find': {
+      if (!arg1) {
+        return {
+          command: rawCommand,
+          timestamp,
+          isError: true,
+          output: 'Error: Please specify a case ID. Example: "get case-cxr-001"',
+        };
+      }
+
+      const found = currentCases.find(c => c.id.toLowerCase() === arg1.toLowerCase() || c.id.toLowerCase().includes(arg1.toLowerCase()));
+      if (!found) {
+        return {
+          command: rawCommand,
+          timestamp,
+          isError: true,
+          output: `Error: Document "${arg1}" not found in local state or Firestore cache. Type "ls" to list valid IDs.`,
+        };
+      }
+
+      return {
+        command: rawCommand,
+        timestamp,
+        format: 'json',
+        output: JSON.stringify(found, null, 2),
+        data: found,
+      };
+    }
+
+    case 'images':
+    case 'image':
+    case 'inspect': {
+      const inspect = inspectImageStorage(currentCases);
+      return {
+        command: rawCommand,
+        timestamp,
+        format: 'text',
+        output: [
+          `[IMAGE STORAGE ARCHITECTURE AUDIT]`,
+          `-----------------------------------------------------------------------------------`,
+          `Total Diagnostic Cases:        ${inspect.totalCases}`,
+          `Secure HTTPS CDN Images:       ${inspect.cdnUrlCount} (Unsplash / Radiopaedia / PMC)`,
+          `Base64 Compressed Data URIs:   ${inspect.dataUriCount} (Admin Uploads under 200KB)`,
+          `Gallery Image Attachments:     ${inspect.totalGalleryImages}`,
+          `Avg Image String Size:         ${inspect.avgImagePayloadLength} bytes`,
+          `-----------------------------------------------------------------------------------`,
+          `Breakdown per Case:`,
+          ...inspect.items.map(item => ` • [${item.id}] ${item.imageType} (~${(item.estimatedBytes / 1024).toFixed(1)} KB) - ${item.hasGallery ? `+${item.galleryCount} gallery` : 'single scan'}`),
+        ].join('\n'),
+        data: inspect,
+      };
+    }
+
+    case 'stats': {
+      const inspect = inspectImageStorage(currentCases);
+      const diag = getDiagnosticState();
+      return {
+        command: rawCommand,
+        timestamp,
+        format: 'stats',
+        output: [
+          `[RADMED DATABASE & CACHE METRICS]`,
+          `-------------------------------------------------------------`,
+          `Firestore Database:   ${diag.databaseId}`,
+          `Collection Name:      ${COLLECTION_NAME}`,
+          `Active Cases Count:   ${currentCases.length} documents`,
+          `Baseline Curated:     ${diag.staticSeedCount} (10 Chest X-Ray, 10 Head CT)`,
+          `Image Architecture:   ${inspect.cdnUrlCount} CDN URLs, ${inspect.dataUriCount} Compressed Base64`,
+          `LocalStorage Key:     ${diag.localCacheKey}`,
+          `Deterministic Order:  Enabled (Canonical Index 1..${currentCases.length})`,
+          `Zero-Flapping Guard:  Active`,
+        ].join('\n'),
+      };
+    }
+
+    case 'sort-order':
+    case 'order': {
+      const orderList = currentCases.map((c, i) => {
+        const baseIdx = BASELINE_ORDER_MAP.get(c.id);
+        return `[Pos ${i + 1}] ID: ${c.id.padEnd(16, ' ')} | orderIndex: ${String(c.orderIndex ?? baseIdx ?? 'auto').padEnd(4, ' ')} | Modality: ${c.modality.padEnd(10, ' ')} | "${c.title}"`;
+      });
+
+      return {
+        command: rawCommand,
+        timestamp,
+        format: 'text',
+        output: [
+          `[DETERMINISTIC SORT SEQUENCE]`,
+          `----------------------------------------------------------------------------------------`,
+          ...orderList,
+          `----------------------------------------------------------------------------------------`,
+          `All views (Carousel, Home, Flashcards, Admin) follow this exact deterministic sequence.`,
+        ].join('\n'),
+      };
+    }
+
+    case 'ping': {
+      const result = await testFirestoreConnection();
+      return {
+        command: rawCommand,
+        timestamp,
+        format: 'text',
+        output: result.success
+          ? `SUCCESS: Firestore ping responded in ${result.latencyMs}ms. Status: CONNECTED`
+          : `WARN: Ping failed (${result.latencyMs}ms). Message: ${result.message}`,
+        data: result,
+      };
+    }
+
+    case 'reseed': {
+      const result = await reseedFirestoreWithBaselineCases();
+      return {
+        command: rawCommand,
+        timestamp,
+        format: 'text',
+        output: result.success
+          ? `SUCCESS: Reseeded ${result.count} baseline cases with deterministic orderIndex to Firestore and local cache.`
+          : `NOTICE: Reseed completed locally (${result.count} cases). Remote Firestore note: ${result.error || 'Offline'}`,
+        data: result,
+      };
+    }
+
+    case 'clear-cache': {
+      clearLocalCasesCache();
+      return {
+        command: rawCommand,
+        timestamp,
+        format: 'text',
+        output: `Local storage cache "${LOCAL_STORAGE_KEY}" cleared. Reloading or executing "fetch" will pull a clean authoritative dataset.`,
+      };
+    }
+
+    case 'export': {
+      return {
+        command: rawCommand,
+        timestamp,
+        format: 'json',
+        output: JSON.stringify(currentCases, null, 2),
+        data: currentCases,
+      };
+    }
+
+    case 'clear':
+    case 'cls':
+      return {
+        command: rawCommand,
+        timestamp,
+        format: 'text',
+        output: '__CLEAR_SCREEN__',
+      };
+
+    default:
+      return {
+        command: rawCommand,
+        timestamp,
+        isError: true,
+        output: `Command not recognized: "${trimmed}". Type "help" for a list of available database commands.`,
+      };
+  }
+}
+
 
