@@ -1,4 +1,6 @@
 import { MedicalCase, PaymentConfig, PaymentTransaction } from '../types';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 const STORAGE_KEY = 'radmed_premium_access_token';
 const CONFIG_CACHE_KEY = 'radmed_payment_config_cache';
@@ -122,30 +124,61 @@ export async function fetchPaymentConfig(): Promise<PaymentConfig> {
     accountReference: 'RadMed Pro',
   };
 
-  // Load cached configuration if present
+  // 1. Load cached configuration if present and sanitize legacy sandbox Till values
   try {
     const cached = localStorage.getItem(CONFIG_CACHE_KEY);
     if (cached) {
-      Object.assign(defaults, JSON.parse(cached));
+      const parsed = JSON.parse(cached);
+      if (parsed.paybillOrTillNumber === '174379') parsed.paybillOrTillNumber = '1661655';
+      if (parsed.darajaBusinessShortcode === '174379') parsed.darajaBusinessShortcode = '1661655';
+      Object.assign(defaults, parsed);
     }
   } catch {
     // ignore
   }
 
+  // 2. Fetch cloud-persisted payment config from Firestore if available
+  try {
+    const docRef = doc(db, 'settings', 'payment');
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const cloudData = snap.data() as Partial<PaymentConfig>;
+      if (cloudData) {
+        if (cloudData.paybillOrTillNumber === '174379') cloudData.paybillOrTillNumber = '1661655';
+        if (cloudData.darajaBusinessShortcode === '174379') cloudData.darajaBusinessShortcode = '1661655';
+        Object.assign(defaults, cloudData);
+      }
+    }
+  } catch (err) {
+    // ignore firestore offline
+  }
+
+  // 3. Fetch from API endpoint if custom Node server is running
   try {
     const res = await fetch('/api/payment/config');
     const parsed = await safeJsonParse(res);
     if (parsed.ok && parsed.data?.config) {
-      const merged = { ...defaults, ...parsed.data.config };
-      try {
-        localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(merged));
-      } catch {
-        // ignore
-      }
-      return merged;
+      const serverCfg = parsed.data.config;
+      if (serverCfg.paybillOrTillNumber === '174379') serverCfg.paybillOrTillNumber = '1661655';
+      if (serverCfg.darajaBusinessShortcode === '174379') serverCfg.darajaBusinessShortcode = '1661655';
+      Object.assign(defaults, serverCfg);
     }
   } catch (err) {
-    console.warn('Could not fetch server payment config, using defaults/cached:', err);
+    // ignore network errors
+  }
+
+  // Guard against any leftover legacy shortcode
+  if (!defaults.paybillOrTillNumber || defaults.paybillOrTillNumber === '174379') {
+    defaults.paybillOrTillNumber = '1661655';
+  }
+  if (!defaults.darajaBusinessShortcode || defaults.darajaBusinessShortcode === '174379') {
+    defaults.darajaBusinessShortcode = '1661655';
+  }
+
+  try {
+    localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(defaults));
+  } catch {
+    // ignore
   }
 
   return defaults;
@@ -370,7 +403,7 @@ export async function testPalPlussApi(apiKey?: string, adminKey = 'radmed_admin_
   }
 }
 
-// Update payment configuration on server and local cache
+// Update payment configuration on server, Firestore, and local cache
 export async function updatePaymentConfig(
   config: Partial<PaymentConfig>,
   adminKey = 'radmed_admin_secret_key_2026'
@@ -380,7 +413,7 @@ export async function updatePaymentConfig(
   config?: PaymentConfig;
   error?: string;
 }> {
-  // Always update local cache first so static deployments have immediate persistence
+  // 1. Update local cache first
   try {
     const existing = await fetchPaymentConfig();
     const merged = { ...existing, ...config };
@@ -389,6 +422,15 @@ export async function updatePaymentConfig(
     // ignore
   }
 
+  // 2. Persist directly to Firestore settings collection
+  try {
+    const docRef = doc(db, 'settings', 'payment');
+    await setDoc(docRef, config, { merge: true });
+  } catch (err) {
+    console.warn('Could not save payment config to Firestore:', err);
+  }
+
+  // 3. Update server if API available
   try {
     const res = await fetch('/api/admin/payment/config', {
       method: 'POST',
@@ -409,7 +451,7 @@ export async function updatePaymentConfig(
   const updatedConfig = await fetchPaymentConfig();
   return {
     success: true,
-    message: 'Payment configuration saved successfully!',
+    message: 'Payment configuration saved successfully across Cloud & Local storage!',
     config: updatedConfig,
   };
 }

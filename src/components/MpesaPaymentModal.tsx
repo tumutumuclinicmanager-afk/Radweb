@@ -92,6 +92,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
 
   const displayCategory = triggerCategory || selectedCategory;
   const displayTitle = triggerCaseTitle || caseTitle;
+  const effectiveTillNumber = config.paybillOrTillNumber && config.paybillOrTillNumber !== '174379' ? config.paybillOrTillNumber : '1661655';
 
   useEffect(() => {
     if (isOpen) {
@@ -696,7 +697,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
                         <span className="text-slate-400 block text-[10px] uppercase font-semibold">Till Number (Buy Goods):</span>
-                        <strong className="text-emerald-600 dark:text-emerald-400 text-sm font-mono tracking-wider">{config.paybillOrTillNumber || '1661655'}</strong>
+                        <strong className="text-emerald-600 dark:text-emerald-400 text-sm font-mono tracking-wider">{effectiveTillNumber}</strong>
                       </div>
                       <div className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
                         <span className="text-slate-400 block text-[10px] uppercase font-semibold">Amount to Pay:</span>
@@ -707,7 +708,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                     <ol className="text-[11px] text-slate-600 dark:text-slate-400 space-y-1 list-decimal list-inside pt-1">
                       <li>Open M-Pesa on your phone → Select <strong className="text-slate-800 dark:text-slate-200">Lipa na M-Pesa</strong></li>
                       <li>Select <strong className="text-slate-800 dark:text-slate-200">Buy Goods and Services</strong></li>
-                      <li>Enter Till Number: <strong className="text-emerald-600 dark:text-emerald-400 font-mono">{config.paybillOrTillNumber || '1661655'}</strong></li>
+                      <li>Enter Till Number: <strong className="text-emerald-600 dark:text-emerald-400 font-mono">{effectiveTillNumber}</strong></li>
                       <li>Enter Amount: <strong className="text-slate-800 dark:text-slate-200">KES {config.premiumPriceKes}</strong> & Enter your M-Pesa PIN</li>
                     </ol>
                   </div>
