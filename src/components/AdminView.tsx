@@ -37,17 +37,22 @@ import {
   Smartphone,
   CreditCard,
   Sliders,
-  Wallet
+  Wallet,
+  Activity,
+  Wifi
 } from 'lucide-react';
 import { researchCaseWithAI, batchResearchCasesWithAI } from '../services/aiAgentService';
 import { fetchPaymentConfig, testPalPlussApi, updatePaymentConfig } from '../services/paymentService';
 import { verifyAdminPassword, updateAdminPassword } from '../services/adminAuthService';
+import { DiagnosticPanel } from './DiagnosticPanel';
+import { getSafeImageUrl, handleImageError, compressAndReadImageFile } from '../lib/imageUtils';
 
 interface AdminViewProps {
   cases: MedicalCase[];
   onAddCase: (newCase: MedicalCase) => void;
   onDeleteCase: (id: string) => void;
   onBackToHome: () => void;
+  onRefreshCases?: () => Promise<void>;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
@@ -55,6 +60,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   onAddCase,
   onDeleteCase,
   onBackToHome,
+  onRefreshCases,
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return sessionStorage.getItem('rad_admin_auth') === 'true';
@@ -64,8 +70,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState(false);
 
-  // Active Admin Tab: 'ai-agent' | 'manual' | 'automation' | 'payment' | 'security'
-  const [activeTab, setActiveTab] = useState<'ai-agent' | 'manual' | 'automation' | 'payment' | 'security'>('ai-agent');
+  // Active Admin Tab: 'ai-agent' | 'manual' | 'automation' | 'payment' | 'security' | 'diagnostics'
+  const [activeTab, setActiveTab] = useState<'ai-agent' | 'manual' | 'automation' | 'payment' | 'security' | 'diagnostics'>('ai-agent');
 
   // --- ADMIN PASSWORD CHANGE STATE ---
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
@@ -279,17 +285,16 @@ export const AdminView: React.FC<AdminViewProps> = ({
   };
 
   // Upload scan file for AI Analysis
-  const handleScanUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleScanUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setAiScanMimeType(file.type || 'image/jpeg');
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setAiScanBase64(event.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressedBase64 = await compressAndReadImageFile(file, 1920, 0.88);
+        setAiScanBase64(compressedBase64);
+      } catch (err) {
+        console.error('Failed to compress scan image:', err);
+      }
     }
   };
 
@@ -394,29 +399,27 @@ export const AdminView: React.FC<AdminViewProps> = ({
   };
 
   // Manual Form Helpers
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setImageUrl(event.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressedBase64 = await compressAndReadImageFile(file, 1920, 0.88);
+        setImageUrl(compressedBase64);
+      } catch (err) {
+        console.error('Failed to read image file:', err);
+      }
     }
   };
 
-  const handleGalleryFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleGalleryFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setNewGalleryUrl(event.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
+      try {
+        const compressedBase64 = await compressAndReadImageFile(file, 1920, 0.88);
+        setNewGalleryUrl(compressedBase64);
+      } catch (err) {
+        console.error('Failed to read gallery image file:', err);
+      }
     }
   };
 
@@ -861,6 +864,16 @@ export const AdminView: React.FC<AdminViewProps> = ({
         >
           <Key className="w-4 h-4" /> Security & Password
         </button>
+        <button
+          onClick={() => setActiveTab('diagnostics')}
+          className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'diagnostics'
+              ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Activity className="w-4 h-4" /> System & Sync Diagnostics
+        </button>
       </div>
 
       {/* 2-Column Main Workspace */}
@@ -1050,7 +1063,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     {aiScanBase64 && (
                       <div className="pt-3 flex items-center justify-center gap-4">
                         <div className="w-24 h-24 rounded-xl overflow-hidden border border-indigo-300 dark:border-indigo-700 bg-black">
-                          <img src={aiScanBase64} alt="Uploaded Scan" className="w-full h-full object-contain" />
+                          <img 
+                            src={getSafeImageUrl(aiScanBase64, 400, 85)} 
+                            alt="Uploaded Scan" 
+                            referrerPolicy="no-referrer"
+                            onError={(e) => handleImageError(e)}
+                            className="w-full h-full object-contain" 
+                          />
                         </div>
                         <div className="text-left text-xs">
                           <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
@@ -1268,7 +1287,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-4">
                     <div className="flex flex-col sm:flex-row gap-4 items-start">
                       <div className="w-32 h-32 rounded-xl bg-black overflow-hidden flex-shrink-0 border border-slate-300 dark:border-slate-600">
-                        <img src={generatedCase.imageUrl} alt={generatedCase.title} className="w-full h-full object-cover" />
+                        <img 
+                          src={getSafeImageUrl(generatedCase.imageUrl, 400, 85)} 
+                          alt={generatedCase.title} 
+                          referrerPolicy="no-referrer"
+                          onError={(e) => handleImageError(e)}
+                          className="w-full h-full object-cover" 
+                        />
                       </div>
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2">
@@ -1352,7 +1377,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
                       <div key={i} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 rounded-xl bg-black overflow-hidden flex-shrink-0">
-                            <img src={c.imageUrl} alt={c.title} className="w-full h-full object-cover" />
+                            <img 
+                              src={getSafeImageUrl(c.imageUrl, 200, 80)} 
+                              alt={c.title} 
+                              referrerPolicy="no-referrer"
+                              onError={(e) => handleImageError(e)}
+                              className="w-full h-full object-cover" 
+                            />
                           </div>
                           <div>
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
@@ -1532,7 +1563,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   {imageUrl && (
                     <div className="flex items-center gap-4 pt-2">
                       <div className="w-20 h-20 rounded-xl overflow-hidden bg-black border border-slate-300 dark:border-slate-600">
-                        <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                        <img 
+                          src={getSafeImageUrl(imageUrl, 300, 85)} 
+                          alt="Preview" 
+                          referrerPolicy="no-referrer"
+                          onError={(e) => handleImageError(e)}
+                          className="w-full h-full object-cover" 
+                        />
                       </div>
                       <div className="text-xs text-slate-500">
                         <span className="font-semibold text-emerald-600 dark:text-emerald-400">Image Loaded</span>
@@ -1555,7 +1592,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       {galleryImages.map((img, idx) => (
                         <div key={idx} className="relative group rounded-xl overflow-hidden border border-slate-300 dark:border-slate-600 aspect-square bg-black">
-                          <img src={img.url} alt={img.caption} className="w-full h-full object-cover" />
+                          <img 
+                            src={getSafeImageUrl(img.url, 300, 85)} 
+                            alt={img.caption} 
+                            referrerPolicy="no-referrer"
+                            onError={(e) => handleImageError(e)}
+                            className="w-full h-full object-cover" 
+                          />
                           <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity p-2 flex flex-col justify-between text-[11px] text-white">
                             <span className="truncate">{img.caption}</span>
                             <button
@@ -2415,6 +2458,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
               </div>
             </div>
           )}
+
+          {/* --- TAB 6: SYSTEM & SYNC DIAGNOSTICS --- */}
+          {activeTab === 'diagnostics' && (
+            <DiagnosticPanel
+              cases={cases}
+              onRefreshCases={onRefreshCases || (async () => {})}
+            />
+          )}
         </div>
 
         {/* Right Column: Live Library Inventory */}
@@ -2447,7 +2498,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   }`}
                 >
                   <div className="w-12 h-12 rounded-xl bg-black flex-shrink-0 overflow-hidden border border-slate-200 dark:border-slate-700">
-                    <img src={c.imageUrl} alt={c.imageAlt} className="w-full h-full object-cover" />
+                    <img 
+                      src={getSafeImageUrl(c.imageUrl, 200, 80)} 
+                      alt={c.imageAlt || c.title} 
+                      referrerPolicy="no-referrer"
+                      onError={(e) => handleImageError(e)}
+                      className="w-full h-full object-cover" 
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">

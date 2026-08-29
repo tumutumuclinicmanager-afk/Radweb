@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { MedicalCase } from '../types';
 import { isCaseLocked, getCaseCategoryIndex, FREE_CXR_LIMIT, FREE_CT_LIMIT } from '../services/paymentService';
+import { getSafeImageUrl, handleImageError } from '../lib/imageUtils';
 
 interface CaseDetailViewProps {
   currentCase: MedicalCase;
@@ -275,9 +276,11 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                   className="relative rounded-2xl overflow-hidden bg-slate-950 shadow-lg border border-slate-200 dark:border-slate-800 group"
                 >
                   <img 
-                    src={selectedImgUrl} 
-                    alt={selectedCaption}
-                    onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80'; }}
+                    src={getSafeImageUrl(selectedImgUrl, 1200, 85)} 
+                    alt={selectedCaption || currentCase.title}
+                    loading="eager"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => handleImageError(e)}
                     className="w-full h-80 sm:h-[420px] object-cover transition-all duration-300 cursor-zoom-in"
                     onClick={() => {
                       setZoomLevel(1);
@@ -355,7 +358,14 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                               : 'border-slate-300 dark:border-slate-700 opacity-70 hover:opacity-100'
                           }`}
                         >
-                          <img src={img.url} alt={img.caption} className="w-full h-full object-cover" />
+                          <img 
+                            src={getSafeImageUrl(img.url, 200, 80)} 
+                            alt={img.caption || currentCase.title} 
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => handleImageError(e)}
+                            className="w-full h-full object-cover" 
+                          />
                         </button>
                       ))}
                     </div>
@@ -714,9 +724,10 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
               className="relative overflow-hidden max-h-[75vh] max-w-full rounded-2xl border border-slate-800 bg-slate-950 p-2 mt-16 flex items-center justify-center select-none group cursor-grab active:cursor-grabbing"
             >
               <img
-                src={selectedImgUrl}
-                alt={selectedCaption}
-                onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80'; }}
+                src={getSafeImageUrl(selectedImgUrl, 1600, 90)}
+                alt={selectedCaption || currentCase.title}
+                referrerPolicy="no-referrer"
+                onError={(e) => handleImageError(e)}
                 style={{
                   transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
                   transition: isDragging || initialPinchDist ? 'none' : 'transform 0.15s ease-out'

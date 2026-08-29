@@ -12,6 +12,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { MedicalCase, Modality } from '../types';
+import { getSafeImageUrl, handleImageError } from '../lib/imageUtils';
 
 interface FlashcardsViewProps {
   cases: MedicalCase[];
@@ -178,8 +179,10 @@ export const FlashcardsView: React.FC<FlashcardsViewProps> = ({
             <div className="w-full space-y-6 animate-fadeIn">
               <div className="relative w-full max-w-md h-64 sm:h-72 mx-auto rounded-2xl overflow-hidden bg-slate-950 shadow-lg border border-slate-200 dark:border-slate-800">
                 <img 
-                  src={currentCard.imageUrl} 
-                  alt={currentCard.imageAlt}
+                  src={getSafeImageUrl(currentCard.imageUrl, 800, 80)} 
+                  alt={currentCard.imageAlt || currentCard.title}
+                  referrerPolicy="no-referrer"
+                  onError={(e) => handleImageError(e)}
                   className="w-full h-full object-cover" 
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent"></div>

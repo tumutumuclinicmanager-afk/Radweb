@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { ActiveView, Modality, MedicalCase } from '../types';
 import { isCaseLocked, FREE_CXR_LIMIT, FREE_CT_LIMIT } from '../services/paymentService';
+import { getSafeImageUrl, handleImageError } from '../lib/imageUtils';
 
 interface HomeScreenProps {
   setActiveView: (view: ActiveView) => void;
@@ -156,7 +157,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         className="flex items-center gap-3 p-3 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl cursor-pointer transition-colors"
                       >
                         <div className="w-12 h-12 rounded-lg bg-slate-200 dark:bg-slate-800 flex-shrink-0 overflow-hidden relative">
-                          <img src={c.imageUrl} alt={c.imageAlt} className={`w-full h-full object-cover ${locked ? 'blur-xs opacity-60' : ''}`} />
+                          <img 
+                            src={getSafeImageUrl(c.imageUrl, 200, 80)} 
+                            alt={c.imageAlt || c.title} 
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => handleImageError(e)}
+                            className={`w-full h-full object-cover transition-opacity duration-300 ${locked ? 'blur-xs opacity-60' : ''}`} 
+                          />
                           {locked && (
                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                               <Lock className="w-3.5 h-3.5 text-amber-300" />
@@ -308,10 +316,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 >
                   <div className="relative h-56 bg-slate-950 overflow-hidden">
                     <img 
-                      src={c.imageUrl} 
-                      alt={c.imageAlt}
-                      onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80'; }}
-                      className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${
+                      src={getSafeImageUrl(c.imageUrl, 800, 80)} 
+                      alt={c.imageAlt || c.title}
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => handleImageError(e)}
+                      className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${
                         locked ? 'blur-sm opacity-60' : 'opacity-90'
                       }`} 
                     />
@@ -443,10 +453,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 >
                   <div className="relative h-56 bg-slate-950 overflow-hidden">
                     <img 
-                      src={c.imageUrl} 
-                      alt={c.imageAlt}
-                      onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80'; }}
-                      className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${
+                      src={getSafeImageUrl(c.imageUrl, 800, 80)} 
+                      alt={c.imageAlt || c.title}
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => handleImageError(e)}
+                      className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${
                         locked ? 'blur-sm opacity-60' : 'opacity-90'
                       }`} 
                     />

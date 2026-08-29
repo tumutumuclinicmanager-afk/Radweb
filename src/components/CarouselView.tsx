@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { MedicalCase, Modality, Category } from '../types';
 import { isCaseLocked, getCaseCategoryIndex, FREE_CXR_LIMIT, FREE_CT_LIMIT } from '../services/paymentService';
+import { getSafeImageUrl, handleImageError } from '../lib/imageUtils';
 
 interface CarouselViewProps {
   cases: MedicalCase[];
@@ -262,10 +263,12 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
                   {/* Image Header with Badge */}
                   <div className="relative h-64 bg-slate-900 overflow-hidden">
                     <img 
-                      src={c.imageUrl} 
-                      alt={c.imageAlt}
-                      onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=1200&q=80'; }}
-                      className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${
+                      src={getSafeImageUrl(c.imageUrl, 800, 80)} 
+                      alt={c.imageAlt || c.title}
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => handleImageError(e)}
+                      className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${
                         locked ? 'blur-sm opacity-60' : 'opacity-90 group-hover:opacity-100'
                       }`} 
                     />

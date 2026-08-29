@@ -89,13 +89,14 @@ export default function App() {
     }
   };
 
+  const handleRefreshCases = async () => {
+    const fetched = await fetchCases();
+    const unique = Array.from(new Map(fetched.map(c => [c.id, c])).values());
+    setCases(unique);
+  };
+
   useEffect(() => {
-    fetchCases().then((fetched) => {
-      if (fetched && fetched.length > 0) {
-        const unique = Array.from(new Map(fetched.map(c => [c.id, c])).values());
-        setCases(unique);
-      }
-    });
+    handleRefreshCases();
   }, []);
 
   const [darkMode, setDarkMode] = useState<boolean>(() => {
@@ -238,6 +239,7 @@ export default function App() {
                 onAddCase={handleAddCase}
                 onDeleteCase={handleDeleteCase}
                 onBackToHome={() => setActiveView('home')}
+                onRefreshCases={handleRefreshCases}
               />
             )}
 
