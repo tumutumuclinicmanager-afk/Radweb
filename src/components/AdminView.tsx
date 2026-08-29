@@ -92,8 +92,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
     palplussApiKey: '',
     palplussChannelId: '',
     darajaEnvironment: 'sandbox',
-    darajaBusinessShortcode: '174379',
-    paybillOrTillNumber: '174379',
+    darajaBusinessShortcode: '1661655',
+    paybillOrTillNumber: '1661655',
     accountReference: 'RadMed Pro',
   });
   const [palplussApiKeyInput, setPalplussApiKeyInput] = useState<string>('');
@@ -2185,6 +2185,24 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     />
                   </div>
 
+                  {/* Till / Paybill Number */}
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
+                      Till / Paybill Number (Buy Goods)
+                    </label>
+                    <input
+                      type="text"
+                      value={paymentConfigState.paybillOrTillNumber || '1661655'}
+                      onChange={(e) => setPaymentConfigState(prev => ({ 
+                        ...prev, 
+                        paybillOrTillNumber: e.target.value,
+                        darajaBusinessShortcode: e.target.value 
+                      }))}
+                      placeholder="1661655"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-emerald-600 dark:text-emerald-400 font-mono font-bold focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
+
                   {/* Account Reference */}
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2">
@@ -2259,6 +2277,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           activeProvider: providerInput,
                           palplussApiKey: palplussApiKeyInput || undefined,
                           palplussChannelId: palplussChannelInput || undefined,
+                          paybillOrTillNumber: paymentConfigState.paybillOrTillNumber || '1661655',
+                          darajaBusinessShortcode: paymentConfigState.paybillOrTillNumber || '1661655',
                           accountReference: paymentConfigState.accountReference,
                         });
                         setIsSavingPayment(false);

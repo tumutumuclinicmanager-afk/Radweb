@@ -117,8 +117,8 @@ export async function fetchPaymentConfig(): Promise<PaymentConfig> {
     activeProvider: 'palpluss',
     palplussApiKey: 'pp_live_2f9aa2197ab69a9a6915bd538f519a059ffd7e6ca6568b68',
     darajaEnvironment: 'sandbox',
-    darajaBusinessShortcode: '174379',
-    paybillOrTillNumber: '174379',
+    darajaBusinessShortcode: '1661655',
+    paybillOrTillNumber: '1661655',
     accountReference: 'RadMed Pro',
   };
 
@@ -215,7 +215,7 @@ export async function initiateMpesaStkPush(phoneNumber: string, amount?: number)
       // If direct call cannot execute due to browser CORS, provide manual fallback
       return {
         success: false,
-        error: `Please pay KES ${payable} via M-Pesa to Paybill ${config.paybillOrTillNumber || '174379'} (Account: RadMed), then enter the M-Pesa confirmation code below to unlock instantly.`,
+        error: `Please pay KES ${payable} via M-Pesa to Till / Buy Goods ${config.paybillOrTillNumber || '1661655'} (or Account: RadMed), then enter the M-Pesa confirmation code below to unlock instantly.`,
       };
     }
 

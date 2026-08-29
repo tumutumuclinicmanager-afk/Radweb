@@ -11,8 +11,8 @@ let paymentConfig = {
   palplussApiKey: process.env.PALPLUSS_API_KEY || 'pp_live_2f9aa2197ab69a9a6915bd538f519a059ffd7e6ca6568b68',
   palplussChannelId: process.env.PALPLUSS_CHANNEL_ID || '',
   darajaEnvironment: 'sandbox',
-  darajaBusinessShortcode: '174379',
-  paybillOrTillNumber: '174379',
+  darajaBusinessShortcode: '1661655',
+  paybillOrTillNumber: '1661655',
   accountReference: 'RadMed Pro',
 };
 

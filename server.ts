@@ -901,8 +901,8 @@ let paymentConfig = {
   palplussApiKey: process.env.PALPLUSS_API_KEY || 'pp_live_2f9aa2197ab69a9a6915bd538f519a059ffd7e6ca6568b68',
   palplussChannelId: process.env.PALPLUSS_CHANNEL_ID || '',
   darajaEnvironment: process.env.DARAJA_ENVIRONMENT || 'sandbox',
-  darajaBusinessShortcode: process.env.DARAJA_BUSINESS_SHORTCODE || '174379',
-  paybillOrTillNumber: process.env.DARAJA_BUSINESS_SHORTCODE || '174379',
+  darajaBusinessShortcode: process.env.DARAJA_BUSINESS_SHORTCODE || '1661655',
+  paybillOrTillNumber: process.env.DARAJA_BUSINESS_SHORTCODE || '1661655',
   accountReference: 'RadMed Pro',
 };
 
@@ -1242,7 +1242,7 @@ app.post('/api/payment/mpesa/stkpush', async (req, res) => {
     // ==========================================
     const accessToken = await getDarajaAccessToken();
     if (accessToken) {
-      const shortcode = process.env.DARAJA_BUSINESS_SHORTCODE || '174379';
+      const shortcode = process.env.DARAJA_BUSINESS_SHORTCODE || paymentConfig.darajaBusinessShortcode || '1661655';
       const passkey = process.env.DARAJA_PASSKEY || 'bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919';
       const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
       const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');

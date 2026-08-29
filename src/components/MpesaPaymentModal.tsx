@@ -85,8 +85,8 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
     premiumPriceKes: 1000,
     activeProvider: 'mpesa_daraja',
     darajaEnvironment: 'sandbox',
-    darajaBusinessShortcode: '174379',
-    paybillOrTillNumber: '174379',
+    darajaBusinessShortcode: '1661655',
+    paybillOrTillNumber: '1661655',
     accountReference: 'RadMed Pro',
   });
 
@@ -683,23 +683,33 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
               {/* TAB 2: MANUAL CODE ENTRY */}
               {activeTab === 'manual_code' && (
                 <form onSubmit={handleVerifyManualCode} className="space-y-3.5">
-                  <div className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
-                      Paybill / Till Instructions
-                    </h4>
+                  <div className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        Lipa na M-Pesa (Till Number / Buy Goods)
+                      </h4>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                        Buy Goods
+                      </span>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-700">
-                        <span className="text-slate-400 block text-[10px]">Paybill / Till:</span>
-                        <strong className="text-emerald-600 dark:text-emerald-400 text-xs font-mono">{config.paybillOrTillNumber}</strong>
+                      <div className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Till Number (Buy Goods):</span>
+                        <strong className="text-emerald-600 dark:text-emerald-400 text-sm font-mono tracking-wider">{config.paybillOrTillNumber || '1661655'}</strong>
                       </div>
-                      <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-700">
-                        <span className="text-slate-400 block text-[10px]">Account Ref:</span>
-                        <strong className="text-slate-900 dark:text-white text-xs font-mono">{config.accountReference}</strong>
+                      <div className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Amount to Pay:</span>
+                        <strong className="text-slate-900 dark:text-white text-sm font-mono">KES {config.premiumPriceKes}</strong>
                       </div>
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
-                      Amount: <strong className="text-slate-900 dark:text-white">KES {config.premiumPriceKes}</strong>. Paste the confirmation code from Safaricom SMS below.
-                    </p>
+
+                    <ol className="text-[11px] text-slate-600 dark:text-slate-400 space-y-1 list-decimal list-inside pt-1">
+                      <li>Open M-Pesa on your phone → Select <strong className="text-slate-800 dark:text-slate-200">Lipa na M-Pesa</strong></li>
+                      <li>Select <strong className="text-slate-800 dark:text-slate-200">Buy Goods and Services</strong></li>
+                      <li>Enter Till Number: <strong className="text-emerald-600 dark:text-emerald-400 font-mono">{config.paybillOrTillNumber || '1661655'}</strong></li>
+                      <li>Enter Amount: <strong className="text-slate-800 dark:text-slate-200">KES {config.premiumPriceKes}</strong> & Enter your M-Pesa PIN</li>
+                    </ol>
                   </div>
 
                   <div>
