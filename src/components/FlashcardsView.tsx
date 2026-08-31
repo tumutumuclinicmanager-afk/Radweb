@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Layers, 
   RotateCw, 
@@ -28,19 +28,20 @@ export const FlashcardsView: React.FC<FlashcardsViewProps> = ({
   reviewedCases,
 }) => {
   const [modality, setModality] = useState<Modality>('chest_xray');
-  const [deck, setDeck] = useState<MedicalCase[]>(
-    [...cases.filter(c => c.modality === 'chest_xray')]
-  );
+  const [deck, setDeck] = useState<MedicalCase[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [knownCards, setKnownCards] = useState<string[]>([]);
 
-  const handleModalityChange = (m: Modality) => {
-    setModality(m);
-    const filtered = cases.filter(c => c.modality === m);
+  useEffect(() => {
+    const filtered = cases.filter(c => c.modality === modality);
     setDeck(filtered);
     setCurrentIndex(0);
     setIsFlipped(false);
+  }, [cases, modality]);
+
+  const handleModalityChange = (m: Modality) => {
+    setModality(m);
   };
 
   const handleShuffle = () => {

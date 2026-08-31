@@ -300,90 +300,106 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             className="flex gap-6 overflow-x-auto pb-4 pt-2 px-1 scrollbar-none snap-x snap-mandatory"
             style={{ scrollBehavior: 'smooth' }}
           >
-            {cxrCases.map((c) => {
-              const isReviewed = reviewedCases.includes(c.id);
-              const locked = isCaseLocked(c, cases, isPremium);
-
-              return (
-                <div
-                  key={c.id}
-                  onClick={() => handleCaseClick(c)}
-                  className={`flex-shrink-0 w-80 bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-xl border transition-all cursor-pointer snap-center group flex flex-col justify-between ${
-                    locked
-                      ? 'border-amber-400/40 dark:border-amber-500/30 hover:border-emerald-500'
-                      : 'border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50'
-                  }`}
+            {cxrCases.length === 0 ? (
+              <div className="w-full py-12 px-6 rounded-3xl border border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 flex flex-col items-center justify-center text-center">
+                <Layers className="w-10 h-10 text-blue-500 mb-3 opacity-60" />
+                <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1">No Chest X-Ray Cases in Database</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mb-4">
+                  Your Firestore database is currently ready for new cases. Upload clinical imaging or generate curated cases using the AI Agent.
+                </p>
+                <button
+                  onClick={() => setActiveView('admin')}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
                 >
-                  <div className="relative h-56 bg-slate-950 overflow-hidden">
-                    <img 
-                      src={getSafeImageUrl(c.imageUrl, 800, 80)} 
-                      alt={c.imageAlt || c.title}
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => handleImageError(e)}
-                      className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${
-                        locked ? 'blur-sm opacity-60' : 'opacity-90'
-                      }`} 
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
-                    <div className="absolute top-3 left-3 flex items-center gap-2">
-                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full text-white backdrop-blur-md ${
-                        c.category === 'Emergency Findings' ? 'bg-rose-500/90' : 'bg-blue-600/90'
-                      }`}>
-                        {c.category}
-                      </span>
-                    </div>
+                  <Sparkles className="w-3.5 h-3.5" /> Go to Admin Studio
+                </button>
+              </div>
+            ) : (
+              cxrCases.map((c) => {
+                const isReviewed = reviewedCases.includes(c.id);
+                const locked = isCaseLocked(c, cases, isPremium);
 
-                    {locked ? (
-                      <span className="absolute top-3 right-3 bg-amber-500/95 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full backdrop-blur-md flex items-center gap-1 shadow-md">
-                        <Lock className="w-3 h-3" /> Pro
-                      </span>
-                    ) : isReviewed ? (
-                      <span className="absolute top-3 right-3 bg-emerald-500/90 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-md">
-                        ✓ Reviewed
-                      </span>
-                    ) : null}
-
-                    {locked && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center">
-                        <div className="w-10 h-10 rounded-full bg-slate-900/80 border border-amber-400/40 text-amber-400 flex items-center justify-center mb-1 shadow-lg backdrop-blur-md">
-                          <Lock className="w-5 h-5" />
-                        </div>
-                        <span className="text-[11px] font-bold text-white bg-black/60 px-2.5 py-0.5 rounded-full">
-                          Pay KES 1,000
+                return (
+                  <div
+                    key={c.id}
+                    onClick={() => handleCaseClick(c)}
+                    className={`flex-shrink-0 w-80 bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-xl border transition-all cursor-pointer snap-center group flex flex-col justify-between ${
+                      locked
+                        ? 'border-amber-400/40 dark:border-amber-500/30 hover:border-emerald-500'
+                        : 'border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50'
+                    }`}
+                  >
+                    <div className="relative h-56 bg-slate-950 overflow-hidden">
+                      <img 
+                        src={getSafeImageUrl(c.imageUrl, 800, 80)} 
+                        alt={c.imageAlt || c.title}
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => handleImageError(e)}
+                        className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${
+                          locked ? 'blur-sm opacity-60' : 'opacity-90'
+                        }`} 
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
+                      <div className="absolute top-3 left-3 flex items-center gap-2">
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full text-white backdrop-blur-md ${
+                          c.category === 'Emergency Findings' ? 'bg-rose-500/90' : 'bg-blue-600/90'
+                        }`}>
+                          {c.category}
                         </span>
                       </div>
-                    )}
 
-                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-black/40 backdrop-blur-md">
-                        {c.difficulty}
-                      </span>
                       {locked ? (
-                        <span className="text-xs bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded-lg font-bold flex items-center gap-1 backdrop-blur-md text-white shadow">
-                          <Smartphone className="w-3.5 h-3.5" /> Unlock
+                        <span className="absolute top-3 right-3 bg-amber-500/95 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full backdrop-blur-md flex items-center gap-1 shadow-md">
+                          <Lock className="w-3 h-3" /> Pro
                         </span>
-                      ) : (
-                        <span className="text-xs bg-blue-600/80 hover:bg-blue-600 px-3 py-1 rounded-lg font-semibold flex items-center gap-1 backdrop-blur-md">
-                          <Eye className="w-3.5 h-3.5" /> Inspect Case
+                      ) : isReviewed ? (
+                        <span className="absolute top-3 right-3 bg-emerald-500/90 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-md">
+                          ✓ Reviewed
                         </span>
-                      )}
-                    </div>
-                  </div>
+                      ) : null}
 
-                  <div className="p-5 flex-1 flex flex-col justify-between">
-                    <div>
-                      <h3 className="font-bold text-base text-slate-900 dark:text-white mb-1.5 line-clamp-1 group-hover:text-blue-600 transition-colors">
-                        {c.diagnosis}
-                      </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-                        {locked ? 'Clinical key findings & radiological signs locked. Tap to unlock with M-Pesa.' : c.keyFindings[0]}
-                      </p>
+                      {locked && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center">
+                          <div className="w-10 h-10 rounded-full bg-slate-900/80 border border-amber-400/40 text-amber-400 flex items-center justify-center mb-1 shadow-lg backdrop-blur-md">
+                            <Lock className="w-5 h-5" />
+                          </div>
+                          <span className="text-[11px] font-bold text-white bg-black/60 px-2.5 py-0.5 rounded-full">
+                            Pay KES 1,000
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-black/40 backdrop-blur-md">
+                          {c.difficulty}
+                        </span>
+                        {locked ? (
+                          <span className="text-xs bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded-lg font-bold flex items-center gap-1 backdrop-blur-md text-white shadow">
+                            <Smartphone className="w-3.5 h-3.5" /> Unlock
+                          </span>
+                        ) : (
+                          <span className="text-xs bg-blue-600/80 hover:bg-blue-600 px-3 py-1 rounded-lg font-semibold flex items-center gap-1 backdrop-blur-md">
+                            <Eye className="w-3.5 h-3.5" /> Inspect Case
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-5 flex-1 flex flex-col justify-between">
+                      <div>
+                        <h3 className="font-bold text-base text-slate-900 dark:text-white mb-1.5 line-clamp-1 group-hover:text-blue-600 transition-colors">
+                          {c.diagnosis}
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                          {locked ? 'Clinical key findings & radiological signs locked. Tap to unlock with M-Pesa.' : c.keyFindings[0]}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -437,90 +453,106 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             className="flex gap-6 overflow-x-auto pb-6 pt-2 px-1 scrollbar-none snap-x snap-mandatory"
             style={{ scrollBehavior: 'smooth' }}
           >
-            {ctCases.map((c) => {
-              const isReviewed = reviewedCases.includes(c.id);
-              const locked = isCaseLocked(c, cases, isPremium);
-
-              return (
-                <div
-                  key={c.id}
-                  onClick={() => handleCaseClick(c)}
-                  className={`flex-shrink-0 w-80 bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-xl border transition-all cursor-pointer snap-center group flex flex-col justify-between ${
-                    locked
-                      ? 'border-amber-400/40 dark:border-amber-500/30 hover:border-emerald-500'
-                      : 'border-slate-200/80 dark:border-slate-800 hover:border-indigo-500/50'
-                  }`}
+            {ctCases.length === 0 ? (
+              <div className="w-full py-12 px-6 rounded-3xl border border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 flex flex-col items-center justify-center text-center">
+                <Brain className="w-10 h-10 text-indigo-500 mb-3 opacity-60" />
+                <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1">No Head CT Cases in Database</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mb-4">
+                  Your Firestore database is currently ready for new cases. Upload clinical imaging or generate curated cases using the AI Agent.
+                </p>
+                <button
+                  onClick={() => setActiveView('admin')}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
                 >
-                  <div className="relative h-56 bg-slate-950 overflow-hidden">
-                    <img 
-                      src={getSafeImageUrl(c.imageUrl, 800, 80)} 
-                      alt={c.imageAlt || c.title}
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => handleImageError(e)}
-                      className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${
-                        locked ? 'blur-sm opacity-60' : 'opacity-90'
-                      }`} 
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
-                    <div className="absolute top-3 left-3 flex items-center gap-2">
-                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full text-white backdrop-blur-md ${
-                        c.category === 'Emergency Findings' ? 'bg-rose-500/90' : 'bg-indigo-600/90'
-                      }`}>
-                        {c.category}
-                      </span>
-                    </div>
+                  <Sparkles className="w-3.5 h-3.5" /> Go to Admin Studio
+                </button>
+              </div>
+            ) : (
+              ctCases.map((c) => {
+                const isReviewed = reviewedCases.includes(c.id);
+                const locked = isCaseLocked(c, cases, isPremium);
 
-                    {locked ? (
-                      <span className="absolute top-3 right-3 bg-amber-500/95 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full backdrop-blur-md flex items-center gap-1 shadow-md">
-                        <Lock className="w-3 h-3" /> Pro
-                      </span>
-                    ) : isReviewed ? (
-                      <span className="absolute top-3 right-3 bg-emerald-500/90 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-md">
-                        ✓ Reviewed
-                      </span>
-                    ) : null}
-
-                    {locked && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center">
-                        <div className="w-10 h-10 rounded-full bg-slate-900/80 border border-amber-400/40 text-amber-400 flex items-center justify-center mb-1 shadow-lg backdrop-blur-md">
-                          <Lock className="w-5 h-5" />
-                        </div>
-                        <span className="text-[11px] font-bold text-white bg-black/60 px-2.5 py-0.5 rounded-full">
-                          Pay KES 1,000
+                return (
+                  <div
+                    key={c.id}
+                    onClick={() => handleCaseClick(c)}
+                    className={`flex-shrink-0 w-80 bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-xl border transition-all cursor-pointer snap-center group flex flex-col justify-between ${
+                      locked
+                        ? 'border-amber-400/40 dark:border-amber-500/30 hover:border-emerald-500'
+                        : 'border-slate-200/80 dark:border-slate-800 hover:border-indigo-500/50'
+                    }`}
+                  >
+                    <div className="relative h-56 bg-slate-950 overflow-hidden">
+                      <img 
+                        src={getSafeImageUrl(c.imageUrl, 800, 80)} 
+                        alt={c.imageAlt || c.title}
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => handleImageError(e)}
+                        className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${
+                          locked ? 'blur-sm opacity-60' : 'opacity-90'
+                        }`} 
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
+                      <div className="absolute top-3 left-3 flex items-center gap-2">
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full text-white backdrop-blur-md ${
+                          c.category === 'Emergency Findings' ? 'bg-rose-500/90' : 'bg-indigo-600/90'
+                        }`}>
+                          {c.category}
                         </span>
                       </div>
-                    )}
 
-                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
-                      <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-black/40 backdrop-blur-md">
-                        {c.difficulty}
-                      </span>
                       {locked ? (
-                        <span className="text-xs bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded-lg font-bold flex items-center gap-1 backdrop-blur-md text-white shadow">
-                          <Smartphone className="w-3.5 h-3.5" /> Unlock
+                        <span className="absolute top-3 right-3 bg-amber-500/95 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full backdrop-blur-md flex items-center gap-1 shadow-md">
+                          <Lock className="w-3 h-3" /> Pro
                         </span>
-                      ) : (
-                        <span className="text-xs bg-indigo-600/80 hover:bg-indigo-600 px-3 py-1 rounded-lg font-semibold flex items-center gap-1 backdrop-blur-md">
-                          <Eye className="w-3.5 h-3.5" /> Inspect Case
+                      ) : isReviewed ? (
+                        <span className="absolute top-3 right-3 bg-emerald-500/90 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-md">
+                          ✓ Reviewed
                         </span>
-                      )}
-                    </div>
-                  </div>
+                      ) : null}
 
-                  <div className="p-5 flex-1 flex flex-col justify-between">
-                    <div>
-                      <h3 className="font-bold text-base text-slate-900 dark:text-white mb-1.5 line-clamp-1 group-hover:text-indigo-600 transition-colors">
-                        {c.diagnosis}
-                      </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-                        {locked ? 'Clinical key findings & radiological signs locked. Tap to unlock with M-Pesa.' : c.keyFindings[0]}
-                      </p>
+                      {locked && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center">
+                          <div className="w-10 h-10 rounded-full bg-slate-900/80 border border-amber-400/40 text-amber-400 flex items-center justify-center mb-1 shadow-lg backdrop-blur-md">
+                            <Lock className="w-5 h-5" />
+                          </div>
+                          <span className="text-[11px] font-bold text-white bg-black/60 px-2.5 py-0.5 rounded-full">
+                            Pay KES 1,000
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-black/40 backdrop-blur-md">
+                          {c.difficulty}
+                        </span>
+                        {locked ? (
+                          <span className="text-xs bg-emerald-600 hover:bg-emerald-500 px-3 py-1 rounded-lg font-bold flex items-center gap-1 backdrop-blur-md text-white shadow">
+                            <Smartphone className="w-3.5 h-3.5" /> Unlock
+                          </span>
+                        ) : (
+                          <span className="text-xs bg-indigo-600/80 hover:bg-indigo-600 px-3 py-1 rounded-lg font-semibold flex items-center gap-1 backdrop-blur-md">
+                            <Eye className="w-3.5 h-3.5" /> Inspect Case
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-5 flex-1 flex flex-col justify-between">
+                      <div>
+                        <h3 className="font-bold text-base text-slate-900 dark:text-white mb-1.5 line-clamp-1 group-hover:text-indigo-600 transition-colors">
+                          {c.diagnosis}
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                          {locked ? 'Clinical key findings & radiological signs locked. Tap to unlock with M-Pesa.' : c.keyFindings[0]}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 

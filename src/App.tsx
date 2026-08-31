@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { ActiveView, Modality, MedicalCase, UserProfile } from './types';
-import { MEDICAL_CASES } from './data/casesData';
 import { fetchCases, addCaseToFirestore, deleteCaseFromFirestore, sortCasesDeterministically } from './services/casesService';
 import { getIsPremiumStatus, markUserAsPremium, clearPremiumStatus } from './services/paymentService';
 import { subscribeToAuth, updateUserPremiumStatusInFirestore } from './services/authService';
@@ -18,7 +17,14 @@ import { AuthModal } from './components/AuthModal';
 export default function App() {
   const [activeView, setActiveView] = useState<ActiveView>('home');
   const [selectedModality, setSelectedModality] = useState<Modality>('chest_xray');
-  const [cases, setCases] = useState<MedicalCase[]>(() => sortCasesDeterministically(MEDICAL_CASES));
+  const [cases, setCases] = useState<MedicalCase[]>(() => {
+    try {
+      const cached = localStorage.getItem('radmed_custom_cases_cache');
+      return cached ? sortCasesDeterministically(JSON.parse(cached)) : [];
+    } catch {
+      return [];
+    }
+  });
 
   // User Authentication & Lifetime Pro Access State
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);

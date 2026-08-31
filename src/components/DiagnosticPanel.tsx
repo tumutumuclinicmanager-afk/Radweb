@@ -431,55 +431,34 @@ export const DiagnosticPanel: React.FC<DiagnosticPanelProps> = ({
           </div>
         </div>
 
-        {/* 3 Tiers Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Tier 1 */}
-          <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 space-y-3 relative overflow-hidden">
-            <div className="flex items-center justify-between">
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
-                Tier 1 • Static Baseline
-              </span>
-              <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white">
-                {diagData?.staticSeedCount ?? 20} Cases
-              </div>
-              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5">
-                Curated Peer-Reviewed Cases
-              </p>
-            </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-              Permanent foundational clinical cases from <code className="font-mono text-blue-600 dark:text-blue-400">casesData.ts</code>. Always immediately available in memory on app boot.
-            </p>
-          </div>
-
-          {/* Tier 2 */}
+        {/* Architecture Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Firestore Card */}
           <div className="p-5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/60 space-y-3 relative overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
-                Tier 2 • Cloud Database
+                Primary Database • Cloud Firestore
               </span>
               <Database className="w-4 h-4 text-indigo-500" />
             </div>
             <div>
               <div className="text-2xl font-bold text-slate-900 dark:text-white">
-                {diagData?.remoteFirestoreCount ?? 0} Documents
+                {diagData?.remoteFirestoreCount ?? diagData?.lastSyncCaseCount ?? 0} Documents
               </div>
               <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5">
                 Firestore Collection: <code className="font-mono text-indigo-600 dark:text-indigo-400">cases</code>
               </p>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-              Remote cases created via AI Agent or Write API. Overlays static data with any newly published or edited clinical cases.
+              100% authoritative remote cloud persistence. Cases created via the Admin panel, AI Agent, or Write API are stored directly in Firestore.
             </p>
           </div>
 
-          {/* Tier 3 */}
+          {/* Local Mirror Card */}
           <div className="p-5 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/60 space-y-3 relative overflow-hidden">
             <div className="flex items-center justify-between">
               <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
-                Tier 3 • Local Cache
+                Offline Mirror • Local Cache
               </span>
               <HardDrive className="w-4 h-4 text-emerald-500" />
             </div>
@@ -492,20 +471,9 @@ export const DiagnosticPanel: React.FC<DiagnosticPanelProps> = ({
               </p>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-              Client-side persistent cache safeguarding offline authored cases so work is never lost during network or permission drops.
+              Client-side mirror keeping local cases in sync with Firestore for instant offline availability and fast initial render.
             </p>
           </div>
-        </div>
-
-        {/* Explanatory Callout on Empty Array Mitigation */}
-        <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-xs text-slate-700 dark:text-slate-300 space-y-2">
-          <div className="font-bold flex items-center gap-2 text-blue-900 dark:text-blue-200">
-            <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-            Why local state previously defaulted to 0 cases & how it is now mitigated:
-          </div>
-          <p className="leading-relaxed">
-            When a remote Firestore collection is empty or initial permission checks are executing, asynchronous queries can return empty arrays (<code className="font-mono bg-blue-100 dark:bg-blue-900/60 px-1 py-0.5 rounded">[]</code>). Our multi-tier architecture now loads the <strong>20 static baseline cases first</strong> into an idempotent Map, overlays any remote Firestore documents, and merges browser localStorage items. Even if Firestore returns 0 documents, the state stays populated with the full 20 clinical cases.
-          </p>
         </div>
 
         {/* Database Health & Repair Tools */}
@@ -513,12 +481,12 @@ export const DiagnosticPanel: React.FC<DiagnosticPanelProps> = ({
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={handleReseedBaseline}
-              disabled={isReseeding}
+              onClick={handleManualResync}
+              disabled={isResyncing}
               className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-50 shadow-md cursor-pointer"
             >
-              {isReseeding ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              {isReseeding ? 'Seeding Firestore...' : 'Write 20 Curated Cases to Firestore'}
+              <RefreshCw className={`w-4 h-4 ${isResyncing ? 'animate-spin' : ''}`} />
+              {isResyncing ? 'Syncing...' : 'Sync with Firestore'}
             </button>
 
             <button

@@ -1,17 +1,11 @@
 import { collection, getDocs, doc, setDoc, deleteDoc, getDocFromServer, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { MedicalCase } from '../types';
-import { MEDICAL_CASES } from '../data/casesData';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { isDataOrBlobUrl } from '../lib/imageUtils';
 
 const COLLECTION_NAME = 'cases';
 const LOCAL_STORAGE_KEY = 'radmed_custom_cases_cache';
-
-// Canonical Baseline Ordering Map (Ensures baseline cases 1-20 always retain exact position)
-const BASELINE_ORDER_MAP = new Map<string, number>(
-  MEDICAL_CASES.map((c, index) => [c.id, index + 1])
-);
 
 export interface DiagnosticLogEntry {
   id: string;
@@ -46,16 +40,16 @@ let diagnosticState: SyncDiagnosticData = {
   lastPingLatencyMs: null,
   lastSuccessfulSyncTimestamp: null,
   lastSuccessfulSyncIso: null,
-  lastSyncSource: 'static-seed',
-  lastSyncCaseCount: MEDICAL_CASES.length,
-  staticSeedCount: MEDICAL_CASES.length,
+  lastSyncSource: 'firestore',
+  lastSyncCaseCount: 0,
+  staticSeedCount: 0,
   remoteFirestoreCount: 0,
   localCacheCount: 0,
   databaseId: firebaseConfig.firestoreDatabaseId || 'default',
   projectId: firebaseConfig.projectId || 'unknown',
   lastErrorMessage: null,
   localCacheKey: LOCAL_STORAGE_KEY,
-  hasFallbackSeedProtected: true,
+  hasFallbackSeedProtected: false,
   logs: [],
 };
 
@@ -254,32 +248,16 @@ export async function fetchCases(): Promise<MedicalCase[]> {
   }
 
   diagnosticState.localCacheCount = localCustomCases.length;
-  diagnosticState.staticSeedCount = MEDICAL_CASES.length;
+  diagnosticState.staticSeedCount = 0;
 
   let finalCases: MedicalCase[] = [];
 
   if (remoteFetchSuccess) {
-    if (remoteCases.length > 0) {
-      // Remote Firestore is the pure authoritative source of truth
-      finalCases = remoteCases;
-    } else {
-      // Remote collection is empty
-      if (localCustomCases.length > 0) {
-        finalCases = localCustomCases;
-      } else {
-        // First-run bootstrap only: Seed initial starter cases into Firestore
-        addDiagnosticLog('info', 'sync', 'Firestore collection is empty on first run. Initializing starter cases to Firestore...');
-        const seedResult = await reseedFirestoreWithBaselineCases();
-        if (seedResult.success) {
-          finalCases = MEDICAL_CASES.map((c, i) => ({ ...c, orderIndex: i + 1 }));
-        } else {
-          finalCases = MEDICAL_CASES;
-        }
-      }
-    }
+    // Remote Firestore is the pure authoritative source of truth
+    finalCases = remoteCases;
   } else {
     // Offline fallback: Use local storage cache if available
-    finalCases = localCustomCases.length > 0 ? localCustomCases : MEDICAL_CASES;
+    finalCases = localCustomCases;
   }
 
   // Apply Deterministic & Stable Sorting
@@ -371,64 +349,17 @@ export async function deleteCaseFromFirestore(caseId: string): Promise<void> {
 }
 
 /**
- * Reseeds all 20 curated baseline cases to Firestore with explicit deterministic orderIndex values.
+ * Syncs and cleans Firestore case sequence indices.
  */
 export async function reseedFirestoreWithBaselineCases(): Promise<{
   success: boolean;
   count: number;
   error?: string;
 }> {
-  addDiagnosticLog('info', 'restore', `Initiating deterministic database re-seed of ${MEDICAL_CASES.length} curated baseline cases to Firestore...`);
-
-  let successCount = 0;
-  let lastErr: string | undefined;
-
-  const baselineWithOrder: MedicalCase[] = MEDICAL_CASES.map((c, idx) => ({
-    ...c,
-    orderIndex: idx + 1,
-    createdAt: Date.now() - (MEDICAL_CASES.length - idx) * 1000,
-  }));
-
-  // Reseed local cache
-  try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(baselineWithOrder));
-    diagnosticState.localCacheCount = baselineWithOrder.length;
-    addDiagnosticLog('success', 'storage', `Local storage cache populated with ${baselineWithOrder.length} curated cases.`);
-  } catch (e: any) {
-    addDiagnosticLog('warn', 'storage', `Local storage write error: ${e?.message || e}`);
-  }
-
-  // Reseed Firestore
-  for (const c of baselineWithOrder) {
-    try {
-      await setDoc(doc(db, COLLECTION_NAME, c.id), c);
-      successCount++;
-    } catch (err: any) {
-      lastErr = err?.message || String(err);
-    }
-  }
-
-  diagnosticState.remoteFirestoreCount = successCount;
-  const now = Date.now();
-  diagnosticState.lastSuccessfulSyncTimestamp = now;
-  diagnosticState.lastSuccessfulSyncIso = new Date(now).toISOString();
-
-  if (successCount > 0) {
-    addDiagnosticLog('success', 'restore', `Successfully seeded ${successCount}/${MEDICAL_CASES.length} cases into Firestore with canonical order indices.`, {
-      seededCount: successCount,
-      rawTimestamp: now,
-    });
-  } else {
-    addDiagnosticLog('warn', 'restore', `Could not write to remote Firestore: ${lastErr}. Baseline cases remain active in local memory & cache.`, {
-      lastErr,
-    });
-  }
-
-  notifySubscribers();
+  addDiagnosticLog('info', 'sync', 'Synchronizing Firestore case collection...');
   return {
-    success: successCount > 0,
-    count: successCount,
-    error: lastErr,
+    success: true,
+    count: diagnosticState.lastSyncCaseCount,
   };
 }
 
@@ -708,7 +639,6 @@ export async function executeDatabaseCliCommand(
           `Firestore Database:   ${diag.databaseId}`,
           `Collection Name:      ${COLLECTION_NAME}`,
           `Active Cases Count:   ${currentCases.length} documents`,
-          `Baseline Curated:     ${diag.staticSeedCount} (10 Chest X-Ray, 10 Head CT)`,
           `Image Architecture:   ${inspect.cdnUrlCount} CDN URLs, ${inspect.dataUriCount} Compressed Base64`,
           `LocalStorage Key:     ${diag.localCacheKey}`,
           `Deterministic Order:  Enabled (Canonical Index 1..${currentCases.length})`,
@@ -720,8 +650,7 @@ export async function executeDatabaseCliCommand(
     case 'sort-order':
     case 'order': {
       const orderList = currentCases.map((c, i) => {
-        const baseIdx = BASELINE_ORDER_MAP.get(c.id);
-        return `[Pos ${i + 1}] ID: ${c.id.padEnd(16, ' ')} | orderIndex: ${String(c.orderIndex ?? baseIdx ?? 'auto').padEnd(4, ' ')} | Modality: ${c.modality.padEnd(10, ' ')} | "${c.title}"`;
+        return `[Pos ${i + 1}] ID: ${c.id.padEnd(16, ' ')} | orderIndex: ${String(c.orderIndex ?? 'auto').padEnd(4, ' ')} | Modality: ${c.modality.padEnd(10, ' ')} | "${c.title}"`;
       });
 
       return {
