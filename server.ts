@@ -913,6 +913,89 @@ app.delete('/api/admin/cases/:id', checkAdminAuth, async (req, res) => {
 });
 
 // ==========================================
+// USER & TESTER AUTHENTICATION ENDPOINTS
+// ==========================================
+
+// POST /api/auth/login: Direct verification endpoint (prevents network-request-failed issues)
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { identifier, password } = req.body;
+    if (!identifier || !password) {
+      return res.status(400).json({ success: false, error: 'Identifier and password are required.' });
+    }
+
+    const cleanIdentifier = String(identifier).trim().toLowerCase();
+    const cleanPass = String(password).trim();
+
+    const db = getFirestoreDatabase();
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database service temporarily unavailable.' });
+    }
+
+    const snap = await getDocs(collection(db, 'users'));
+    let matchedUser: any = null;
+
+    snap.forEach((docSnap) => {
+      const data = docSnap.data();
+      const uEmail = (data.email || '').toLowerCase().trim();
+      const uUsername = (data.username || '').toLowerCase().trim();
+      const uPhone = (data.phoneNumber || '').trim();
+
+      if (
+        uEmail === cleanIdentifier ||
+        uUsername === cleanIdentifier ||
+        uPhone === cleanIdentifier ||
+        (cleanIdentifier.includes('@') && uEmail.startsWith(cleanIdentifier.split('@')[0]))
+      ) {
+        matchedUser = { uid: docSnap.id, ...data };
+      }
+    });
+
+    if (!matchedUser) {
+      return res.status(401).json({
+        success: false,
+        error: 'Account not found. Please verify your username or email address.',
+      });
+    }
+
+    // Verify password if temporaryPassword or password is stored
+    const storedPass = matchedUser.temporaryPassword || matchedUser.password;
+    if (storedPass && storedPass.trim() !== cleanPass) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid password. Please check your credentials.',
+      });
+    }
+
+    // Sanitize user object to return
+    const userProfile = {
+      uid: matchedUser.uid,
+      email: matchedUser.email,
+      username: matchedUser.username,
+      displayName: matchedUser.displayName || matchedUser.username || matchedUser.email?.split('@')[0] || 'Clinician',
+      isPremium: Boolean(matchedUser.isPremium || matchedUser.isTester),
+      isTester: Boolean(matchedUser.isTester),
+      role: matchedUser.role || (matchedUser.isTester ? 'tester' : 'user'),
+      testAccountNote: matchedUser.testAccountNote,
+      mpesaReceiptNumber: matchedUser.mpesaReceiptNumber,
+      phoneNumber: matchedUser.phoneNumber,
+      provider: matchedUser.provider || 'credentials',
+      createdAt: matchedUser.createdAt || new Date().toISOString(),
+      unlockedAt: matchedUser.unlockedAt || new Date().toISOString(),
+    };
+
+    return res.json({
+      success: true,
+      message: 'Authenticated successfully.',
+      user: userProfile,
+    });
+  } catch (err: any) {
+    console.error('Server auth login error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Authentication error.' });
+  }
+});
+
+// ==========================================
 // ADMIN USER & TESTER MANAGEMENT SERVICES
 // ==========================================
 
