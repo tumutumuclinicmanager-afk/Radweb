@@ -242,7 +242,10 @@ Guidelines:
 10. Reporting Template: A structured, formal radiology report excerpt (Impression/Findings).
 11. Teaching Points: 3-4 high-yield CME clinical pearls. Bold the essential rule or pearl keyword using markdown (e.g. "Always assess **bone windows** for occult calvarial fractures").
 12. CME Tip: 1 memorable "Gold Standard" pearl.
-13. Image Alt: Descriptive clinical caption of the imaging appearance.`;
+13. Image Alt: Descriptive clinical caption of the imaging appearance.
+14. Case Scenario: A comprehensive 2-4 sentence realistic patient presentation vignette (patient age, acute symptoms, vital signs, emergency room/ward arrival).
+15. Case Scenario Image Caption: Clinical caption for the presentation image.
+16. Case Example: A detailed 3-5 step real-world clinical management, intervention resolution, and bedside procedural outcome walkthrough.`;
 
     const contents: any[] = [];
 
@@ -303,6 +306,10 @@ Target Difficulty: ${difficulty || 'Intermediate'}`,
           },
           cmeTip: { type: Type.STRING },
           imageAlt: { type: Type.STRING },
+          caseScenario: { type: Type.STRING, description: 'Realistic emergency presentation patient vignette' },
+          caseScenarioImageUrl: { type: Type.STRING, description: 'Direct image URL for the clinical scenario' },
+          caseScenarioImageCaption: { type: Type.STRING, description: 'Clinical caption for scenario scan' },
+          caseExample: { type: Type.STRING, description: 'Detailed clinical management, resolution and outcome protocol' },
         },
         required: [
           'title',
@@ -337,6 +344,7 @@ Target Difficulty: ${difficulty || 'Intermediate'}`,
       id: `ai-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       ...parsedCase,
       imageUrl: finalImageUrl,
+      caseScenarioImageUrl: parsedCase.caseScenarioImageUrl || finalImageUrl,
     };
 
     return res.json({
@@ -426,6 +434,10 @@ Ensure realistic clinical diversity. Emphasize key diagnostic terms in bold mark
             },
             cmeTip: { type: Type.STRING },
             imageAlt: { type: Type.STRING },
+            caseScenario: { type: Type.STRING },
+            caseScenarioImageUrl: { type: Type.STRING },
+            caseScenarioImageCaption: { type: Type.STRING },
+            caseExample: { type: Type.STRING },
           },
           required: [
             'title',
@@ -447,11 +459,15 @@ Ensure realistic clinical diversity. Emphasize key diagnostic terms in bold mark
     });
 
     const casesArray = JSON.parse(resultText);
-    const completedCases = casesArray.map((c: any, index: number) => ({
-      id: `ai-batch-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 5)}`,
-      ...c,
-      imageUrl: RADIOLOGY_IMAGE_REPOSITORIES[c.modality as 'chest_xray' | 'head_ct'] || RADIOLOGY_IMAGE_REPOSITORIES.chest_xray,
-    }));
+    const completedCases = casesArray.map((c: any, index: number) => {
+      const img = RADIOLOGY_IMAGE_REPOSITORIES[c.modality as 'chest_xray' | 'head_ct'] || RADIOLOGY_IMAGE_REPOSITORIES.chest_xray;
+      return {
+        id: `ai-batch-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 5)}`,
+        ...c,
+        imageUrl: img,
+        caseScenarioImageUrl: c.caseScenarioImageUrl || img,
+      };
+    });
 
     return res.json({
       success: true,
@@ -526,6 +542,11 @@ function normalizeMedicalCase(raw: any) {
   const reportingTemplate = raw.reportingTemplate || raw.reporting_template || `${modality === 'head_ct' ? 'HEAD CT' : 'CHEST RADIOGRAPH'}:\nFINDINGS: ${keyFindings.join(' ')}\nIMPRESSION: Findings compatible with ${diagnosis}.`;
   const cmeTip = raw.cmeTip || raw.cme_tip || `High Yield: Always verify anatomical alignment and compare with priors when available.`;
 
+  const caseScenario = raw.caseScenario || raw.case_scenario || undefined;
+  const caseScenarioImageUrl = raw.caseScenarioImageUrl || raw.case_scenario_image_url || undefined;
+  const caseScenarioImageCaption = raw.caseScenarioImageCaption || raw.case_scenario_image_caption || undefined;
+  const caseExample = raw.caseExample || raw.case_example || undefined;
+
   const result: any = {
     id: sanitizedId,
     title,
@@ -543,6 +564,11 @@ function normalizeMedicalCase(raw: any) {
     teachingPoints: teachingPoints.length > 0 ? teachingPoints : [`Systematic review is key.`],
     cmeTip,
   };
+
+  if (caseScenario) result.caseScenario = caseScenario;
+  if (caseScenarioImageUrl) result.caseScenarioImageUrl = caseScenarioImageUrl;
+  if (caseScenarioImageCaption) result.caseScenarioImageCaption = caseScenarioImageCaption;
+  if (caseExample) result.caseExample = caseExample;
 
   if (Array.isArray(raw.galleryImages) && raw.galleryImages.length > 0) {
     result.galleryImages = raw.galleryImages;

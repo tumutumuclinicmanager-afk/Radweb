@@ -38,6 +38,7 @@ import {
   CreditCard,
   Sliders,
   Wallet,
+  Stethoscope,
   Activity,
   Wifi,
   Users
@@ -205,6 +206,12 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [cmeTip, setCmeTip] = useState('');
   const [difficulty, setDifficulty] = useState<'Beginner' | 'Intermediate' | 'Advanced'>('Intermediate');
   
+  // Case Scenario & Clinical Example
+  const [caseScenario, setCaseScenario] = useState('');
+  const [caseScenarioImageUrl, setCaseScenarioImageUrl] = useState('');
+  const [caseScenarioImageCaption, setCaseScenarioImageCaption] = useState('');
+  const [caseExample, setCaseExample] = useState('');
+
   // Gallery photos
   const [galleryImages, setGalleryImages] = useState<{ url: string; caption: string }[]>([]);
   const [newGalleryUrl, setNewGalleryUrl] = useState('');
@@ -387,6 +394,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
     setTeachingPoints(c.teachingPoints ? c.teachingPoints.join('\n') : '');
     setCmeTip(c.cmeTip || '');
     setDifficulty(c.difficulty);
+    setCaseScenario(c.caseScenario || '');
+    setCaseScenarioImageUrl(c.caseScenarioImageUrl || c.imageUrl);
+    setCaseScenarioImageCaption(c.caseScenarioImageCaption || '');
+    setCaseExample(c.caseExample || '');
     setGalleryImages(c.galleryImages || []);
     setActiveTab('manual');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -412,6 +423,18 @@ export const AdminView: React.FC<AdminViewProps> = ({
         setImageUrl(compressedBase64);
       } catch (err) {
         console.error('Failed to read image file:', err);
+      }
+    }
+  };
+
+  const handleScenarioImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const compressedBase64 = await compressAndReadImageFile(file, 1920, 0.88);
+        setCaseScenarioImageUrl(compressedBase64);
+      } catch (err) {
+        console.error('Failed to read scenario image file:', err);
       }
     }
   };
@@ -461,6 +484,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
     setTeachingPoints(c.teachingPoints ? c.teachingPoints.join('\n') : '');
     setCmeTip(c.cmeTip || '');
     setDifficulty(c.difficulty);
+    setCaseScenario(c.caseScenario || '');
+    setCaseScenarioImageUrl(c.caseScenarioImageUrl || c.imageUrl);
+    setCaseScenarioImageCaption(c.caseScenarioImageCaption || '');
+    setCaseExample(c.caseExample || '');
     setGalleryImages(c.galleryImages || []);
     setActiveTab('manual');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -479,6 +506,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
     setReportingTemplate('');
     setTeachingPoints('');
     setCmeTip('');
+    setCaseScenario('');
+    setCaseScenarioImageUrl('');
+    setCaseScenarioImageCaption('');
+    setCaseExample('');
     setGalleryImages([]);
     setNewGalleryUrl('');
     setNewGalleryCaption('');
@@ -509,6 +540,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
       teachingPoints: teachingPoints ? teachingPoints.split('\n').filter(Boolean) : ['Correlate clinically with physical examination.'],
       cmeTip: cmeTip || 'Always verify films with clinical history.',
       difficulty,
+      caseScenario: caseScenario.trim() || undefined,
+      caseScenarioImageUrl: caseScenarioImageUrl.trim() || imageUrl,
+      caseScenarioImageCaption: caseScenarioImageCaption.trim() || undefined,
+      caseExample: caseExample.trim() || undefined,
       galleryImages: galleryImages.length > 0 ? galleryImages : undefined,
     };
 
@@ -1379,6 +1414,27 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         </p>
                       </div>
                     </div>
+
+                    {/* Scenario & Example Preview */}
+                    {(generatedCase.caseScenario || generatedCase.caseExample) && (
+                      <div className="p-4 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/60 space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-bold text-indigo-800 dark:text-indigo-200 uppercase tracking-wider">
+                          <Stethoscope className="w-3.5 h-3.5" /> Patient Scenario & Clinical Example Preview
+                        </div>
+                        {generatedCase.caseScenario && (
+                          <div className="text-xs text-slate-700 dark:text-slate-300">
+                            <span className="font-bold text-slate-900 dark:text-white">Scenario: </span>
+                            <FormattedText text={generatedCase.caseScenario} />
+                          </div>
+                        )}
+                        {generatedCase.caseExample && (
+                          <div className="text-xs text-slate-700 dark:text-slate-300 pt-1 border-t border-indigo-100 dark:border-indigo-900/40">
+                            <span className="font-bold text-slate-900 dark:text-white">Management Example: </span>
+                            <FormattedText text={generatedCase.caseExample} />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1772,6 +1828,101 @@ export const AdminView: React.FC<AdminViewProps> = ({
                       placeholder="If patient cannot stand, obtain left lateral decubitus view"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500"
                     />
+                  </div>
+
+                  {/* Dedicated Case Scenario & Clinical Example Section */}
+                  <div className="p-5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-200/80 dark:border-indigo-900/60 space-y-4">
+                    <div className="flex items-center gap-2 text-xs font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">
+                      <Stethoscope className="w-4 h-4" /> Case Scenario & Clinical Example (Bottom Case Section)
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      Provide a realistic patient presentation scenario, an illustrative case radiograph / clinical condition image, and a real-world bedside management example.
+                    </p>
+
+                    <div>
+                      <FormattedTextarea
+                        label="Case Scenario (Patient Vignette & Presentation)"
+                        value={caseScenario}
+                        onChange={setCaseScenario}
+                        rows={3}
+                        placeholder="A 54-year-old male presents to the ED with acute onset severe pleuritic chest pain and dyspnea. Vital signs: BP 90/60 mmHg, HR 120 bpm, SpO2 88% on room air..."
+                        helpText="Describe patient age, presenting triage complaints, vital signs, and bedside physical exam findings."
+                      />
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-900/40 space-y-3">
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                        Case Scenario Image & View
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">
+                            Scenario Image URL (Leave blank to use primary image)
+                          </label>
+                          <input
+                            type="text"
+                            value={caseScenarioImageUrl}
+                            onChange={(e) => setCaseScenarioImageUrl(e.target.value)}
+                            placeholder="https://... (or upload file)"
+                            className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">
+                            Or Upload Scenario Image from Computer
+                          </label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleScenarioImageFileChange}
+                            className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-950 dark:file:text-indigo-300 hover:file:bg-indigo-100 cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] text-slate-500 dark:text-slate-400 mb-1">
+                          Scenario Image Caption
+                        </label>
+                        <input
+                          type="text"
+                          value={caseScenarioImageCaption}
+                          onChange={(e) => setCaseScenarioImageCaption(e.target.value)}
+                          placeholder="e.g. Bedside portable radiograph taken upon emergency admission"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      {(caseScenarioImageUrl || imageUrl) && (
+                        <div className="flex items-center gap-3 pt-1">
+                          <div className="w-16 h-16 rounded-xl overflow-hidden bg-black border border-slate-300 dark:border-slate-700 flex-shrink-0">
+                            <img
+                              src={getSafeImageUrl(caseScenarioImageUrl || imageUrl, 200, 80)}
+                              alt="Scenario Preview"
+                              referrerPolicy="no-referrer"
+                              onError={(e) => handleImageError(e)}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                            <span className="font-semibold text-indigo-600 dark:text-indigo-400">Scenario Image Configured</span>
+                            <p className="truncate max-w-xs">{caseScenarioImageCaption || 'Standard presentation view'}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <FormattedTextarea
+                        label="Case Example (Real-World Clinical Management & Resolution)"
+                        value={caseExample}
+                        onChange={setCaseExample}
+                        rows={3}
+                        placeholder="Emergency Management Protocol:&#10;1. Immediate high-flow oxygen and wide-bore IV access.&#10;2. Emergent needle thoracostomy in 2nd intercostal space.&#10;3. Tube thoracostomy with resolution of tension physiology on repeat radiograph."
+                        helpText="Document the practical management steps, bedside intervention outcome, and clinician communication pearls."
+                      />
+                    </div>
                   </div>
                 </div>
 

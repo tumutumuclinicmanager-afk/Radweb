@@ -21,6 +21,10 @@ export interface MedicalCase {
   orderIndex?: number;
   createdAt?: number | string;
   galleryImages?: { url: string; caption: string }[];
+  caseScenario?: string;
+  caseScenarioImageUrl?: string;
+  caseScenarioImageCaption?: string;
+  caseExample?: string;
 }
 
 export type ActiveView = 'home' | 'cases' | 'flashcards' | 'disclaimer' | 'quiz' | 'admin' | 'interpretation';

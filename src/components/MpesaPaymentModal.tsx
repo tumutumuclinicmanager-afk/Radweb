@@ -8,15 +8,18 @@ import {
   ShieldCheck, 
   Clock, 
   AlertCircle, 
-  CreditCard,
-  Layers,
-  ArrowRight,
-  RefreshCw,
-  QrCode,
-  Mail,
-  User as UserIcon,
-  KeyRound,
-  LogIn
+  CreditCard, 
+  Layers, 
+  ArrowRight, 
+  RefreshCw, 
+  QrCode, 
+  Mail, 
+  User as UserIcon, 
+  KeyRound, 
+  LogIn,
+  Phone,
+  Headphones,
+  MessageSquare
 } from 'lucide-react';
 import { 
   initiateMpesaStkPush, 
@@ -832,6 +835,31 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Support Helpline Info */}
+              <div className="mt-4 p-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-[11px] text-slate-600 dark:text-slate-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Headphones className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                  <span>
+                    Need payment help? <strong>Helpline:</strong>
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <a
+                    href="tel:+254112294835"
+                    className="font-bold text-slate-900 dark:text-white font-mono hover:text-emerald-600 flex items-center gap-1"
+                  >
+                    <Phone className="w-3 h-3 text-emerald-500" /> +254 112 294 835
+                  </a>
+                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                  <a
+                    href="mailto:radmedadmin@gmail.com"
+                    className="font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                  >
+                    <Mail className="w-3 h-3" /> radmedadmin@gmail.com
+                  </a>
+                </div>
+              </div>
 
               {/* Bottom Perks Guarantee */}
               <div className="mt-5 pt-3.5 border-t border-slate-100 dark:border-slate-800 grid grid-cols-3 gap-2 text-center text-slate-500 dark:text-slate-400 text-[11px]">

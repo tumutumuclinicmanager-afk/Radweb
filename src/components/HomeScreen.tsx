@@ -17,7 +17,13 @@ import {
   Lock,
   Smartphone,
   ShieldCheck,
-  Zap
+  Zap,
+  Headphones,
+  Phone,
+  Mail,
+  MessageSquare,
+  Copy,
+  Check
 } from 'lucide-react';
 import { ActiveView, Modality, MedicalCase } from '../types';
 import { isCaseLocked, FREE_CXR_LIMIT, FREE_CT_LIMIT } from '../services/paymentService';
@@ -47,6 +53,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<MedicalCase[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [copiedItem, setCopiedItem] = useState<string | null>(null);
+
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedItem(label);
+    setTimeout(() => setCopiedItem(null), 2500);
+  };
 
   const cxrCarouselRef = useRef<HTMLDivElement>(null);
   const ctCarouselRef = useRef<HTMLDivElement>(null);
@@ -635,6 +648,104 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Educational reference only.
                 </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Dedicated RadMed Helpline & Support Card */}
+          <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 text-white p-6 sm:p-8 border border-slate-800 shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div className="space-y-2 max-w-xl">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold">
+                  <Headphones className="w-3.5 h-3.5" /> RadMed Helpline & Clinical Assistance
+                </div>
+                <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                  Need help with access, M-Pesa payments, or cases?
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Our admin and clinician support team is available to assist you with instant payment verification, account linking, institutional CME packages, or case inquiries.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                {/* Phone / WhatsApp Card */}
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col justify-between gap-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[10px] uppercase font-bold text-emerald-400 flex items-center gap-1">
+                      <Phone className="w-3 h-3" /> Phone / WhatsApp
+                    </span>
+                    <button
+                      onClick={() => handleCopy('+254112294835', 'phone')}
+                      className="text-[10px] text-slate-400 hover:text-white flex items-center gap-1 transition-colors"
+                      title="Copy phone number"
+                    >
+                      {copiedItem === 'phone' ? (
+                        <span className="text-emerald-400 flex items-center gap-0.5"><Check className="w-3 h-3" /> Copied</span>
+                      ) : (
+                        <span className="flex items-center gap-0.5"><Copy className="w-3 h-3" /> Copy</span>
+                      )}
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href="tel:+254112294835"
+                      className="text-sm sm:text-base font-bold font-mono text-white hover:text-emerald-400 transition-colors"
+                    >
+                      +254 112 294 835
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <a
+                      href="https://wa.me/254112294835"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold flex items-center gap-1 transition-colors"
+                    >
+                      <MessageSquare className="w-3 h-3" /> WhatsApp
+                    </a>
+                    <a
+                      href="tel:+254112294835"
+                      className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold flex items-center gap-1 transition-colors"
+                    >
+                      <Phone className="w-3 h-3" /> Call
+                    </a>
+                  </div>
+                </div>
+
+                {/* Email Card */}
+                <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col justify-between gap-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[10px] uppercase font-bold text-indigo-400 flex items-center gap-1">
+                      <Mail className="w-3 h-3" /> Email Support
+                    </span>
+                    <button
+                      onClick={() => handleCopy('radmedadmin@gmail.com', 'email')}
+                      className="text-[10px] text-slate-400 hover:text-white flex items-center gap-1 transition-colors"
+                      title="Copy email address"
+                    >
+                      {copiedItem === 'email' ? (
+                        <span className="text-emerald-400 flex items-center gap-0.5"><Check className="w-3 h-3" /> Copied</span>
+                      ) : (
+                        <span className="flex items-center gap-0.5"><Copy className="w-3 h-3" /> Copy</span>
+                      )}
+                    </button>
+                  </div>
+                  <a
+                    href="mailto:radmedadmin@gmail.com"
+                    className="text-xs sm:text-sm font-semibold text-white hover:text-indigo-300 transition-colors truncate"
+                  >
+                    radmedadmin@gmail.com
+                  </a>
+                  <div className="flex items-center gap-2 pt-1">
+                    <a
+                      href="mailto:radmedadmin@gmail.com"
+                      className="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold flex items-center gap-1 transition-colors"
+                    >
+                      <Mail className="w-3 h-3" /> Send Email
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

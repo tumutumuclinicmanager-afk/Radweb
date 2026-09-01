@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, BookOpen, Stethoscope, CheckCircle2, Award, X } from 'lucide-react';
+import { ShieldAlert, BookOpen, Stethoscope, CheckCircle2, Award, X, Phone, Mail, Headphones, MessageSquare } from 'lucide-react';
 
 interface DisclaimerModalProps {
   onClose: () => void;
@@ -75,6 +75,38 @@ export const DisclaimerModal: React.FC<DisclaimerModalProps> = ({ onClose }) => 
             <p className="text-xs sm:text-sm leading-relaxed">
               RadCarousel is intended solely for <strong>continuous medical education and academic training purposes</strong>. It is <strong>not</strong> a medical device and must never be used as a substitute for formal radiology training, professional clinical judgment, or official diagnostic interpretation by a board-certified radiologist. Patient care decisions must always be based on comprehensive clinical evaluation and official radiology reports.
             </p>
+          </div>
+
+          {/* Academic Support & Clinical Helpline */}
+          <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
+            <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2 text-base">
+              <Headphones className="w-5 h-5 text-blue-600 dark:text-blue-400" /> RadMed Helpline & Support
+            </h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+              For case submissions, residency curriculum integration, payment confirmation, or clinical feedback, contact the administrative and clinical support desk:
+            </p>
+            <div className="flex flex-wrap gap-4 pt-1 text-xs">
+              <a
+                href="tel:+254112294835"
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono font-bold hover:border-emerald-500 transition-colors"
+              >
+                <Phone className="w-4 h-4 text-emerald-500" /> +254 112 294 835
+              </a>
+              <a
+                href="https://wa.me/254112294835"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-colors"
+              >
+                <MessageSquare className="w-4 h-4" /> WhatsApp Us
+              </a>
+              <a
+                href="mailto:radmedadmin@gmail.com"
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-blue-600 dark:text-blue-400 font-semibold hover:border-blue-500 transition-colors"
+              >
+                <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400" /> radmedadmin@gmail.com
+              </a>
+            </div>
           </div>
 
         </div>

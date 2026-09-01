@@ -490,6 +490,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <span>Continue with Google</span>
               </button>
 
+              {/* Support helpline info */}
+              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800/80 text-[11px] text-center text-slate-500 dark:text-slate-400">
+                <span>Need assistance? Helpline: </span>
+                <a href="tel:+254112294835" className="font-mono font-bold text-slate-800 dark:text-slate-200 hover:text-emerald-500">
+                  +254 112 294 835
+                </a>
+                <span className="mx-1.5">•</span>
+                <a href="mailto:radmedadmin@gmail.com" className="text-blue-600 dark:text-blue-400 hover:underline">
+                  radmedadmin@gmail.com
+                </a>
+              </div>
+
               {/* Skip option for post-payment */}
               {isPostPayment && (
                 <div className="text-center mt-3">

@@ -1,5 +1,27 @@
-import React from 'react';
-import { Stethoscope, BookOpen, Layers, Moon, Sun, Home, ShieldAlert, Lock, X, CheckCircle2, Smartphone, ShieldCheck, Zap, User, LogIn } from 'lucide-react';
+import React, { useState } from 'react';
+import { 
+  Stethoscope, 
+  BookOpen, 
+  Layers, 
+  Moon, 
+  Sun, 
+  Home, 
+  ShieldAlert, 
+  Lock, 
+  X, 
+  CheckCircle2, 
+  Smartphone, 
+  ShieldCheck, 
+  Zap, 
+  User, 
+  LogIn,
+  Phone,
+  Mail,
+  Headphones,
+  Copy,
+  Check,
+  MessageSquare
+} from 'lucide-react';
 import { ActiveView, UserProfile } from '../types';
 import { FREE_CXR_LIMIT, FREE_CT_LIMIT } from '../services/paymentService';
 
@@ -198,6 +220,49 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
                 <span>RadMed Pro • Lifetime Access</span>
               </div>
             )}
+          </div>
+
+          {/* 24/7 Clinical & Payment Helpline */}
+          <div className="pt-2">
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 text-xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5 text-xs">
+                  <Headphones className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  Support Helpline
+                </span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400">
+                  Online
+                </span>
+              </div>
+
+              <div className="space-y-1.5">
+                <a
+                  href="tel:+254112294835"
+                  className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-500 text-slate-700 dark:text-slate-200 transition-colors group"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Phone className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                    <span className="font-mono text-xs font-semibold truncate">+254 112 294 835</span>
+                  </div>
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium group-hover:underline">
+                    Call / WhatsApp
+                  </span>
+                </a>
+
+                <a
+                  href="mailto:radmedadmin@gmail.com"
+                  className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-500 text-slate-700 dark:text-slate-200 transition-colors group"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Mail className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                    <span className="text-xs truncate">radmedadmin@gmail.com</span>
+                  </div>
+                  <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-medium group-hover:underline">
+                    Email
+                  </span>
+                </a>
+              </div>
+            </div>
           </div>
         </div>
 
