@@ -4,7 +4,7 @@ import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, Firestore } from 'firebase/firestore';
+import { getFirestore, collection, doc, getDocs, setDoc, updateDoc, deleteDoc, Firestore } from 'firebase/firestore';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -236,11 +236,11 @@ Guidelines:
 4. Difficulty: Must be one of 'Beginner', 'Intermediate', 'Advanced'.
 5. Question: An engaging board-style clinical/radiological question testing image recognition or immediate management.
 6. Diagnosis: Exact definitive radiological and clinical diagnosis.
-7. Key Findings: An array of 3-5 specific, bulleted radiographic findings.
+7. Key Findings: An array of 3-5 specific, bulleted radiographic findings. Bold the primary anatomical landmark or hallmark radiological sign using markdown syntax (e.g. "**Deep sulcus sign** at the right costophrenic angle", "Marked **midline shift** measuring 6mm").
 8. Clinical Significance: 1-2 concise sentences outlining emergency implications, pathophysiology, or clinical urgency.
 9. Differential Diagnosis: An array of 3-4 realistic radiological mimickers or differentials.
 10. Reporting Template: A structured, formal radiology report excerpt (Impression/Findings).
-11. Teaching Points: 3-4 high-yield CME clinical pearls.
+11. Teaching Points: 3-4 high-yield CME clinical pearls. Bold the essential rule or pearl keyword using markdown (e.g. "Always assess **bone windows** for occult calvarial fractures").
 12. CME Tip: 1 memorable "Gold Standard" pearl.
 13. Image Alt: Descriptive clinical caption of the imaging appearance.`;
 
@@ -388,7 +388,7 @@ app.post('/api/ai/batch-research', async (req, res) => {
 
     const systemInstruction = `You are a Professor of Radiology. Generate a curated batch of ${count} distinct, board-relevant medical imaging cases on the theme "${topic}". 
 Modality constraint: ${modality || 'chest_xray or head_ct'}.
-Ensure realistic clinical diversity.`;
+Ensure realistic clinical diversity. Emphasize key diagnostic terms in bold markdown syntax (e.g. "**Tracheal deviation** to contralateral side", "Always check **bone windows**") in keyFindings and teachingPoints.`;
 
     const { text: resultText } = await generateContentWithResilience(ai, {
       contents: `Generate ${count} comprehensive radiology cases for topic: "${topic}".`,
@@ -772,7 +772,7 @@ app.post('/api/admin/cases/curate-and-publish', checkAdminAuth, async (req, res)
           text: `Curate, research, and format an ACR-compliant radiology teaching case for topic: "${prompt}". Modality: ${modality}. Category: ${category}. Difficulty: ${difficulty}.`
         });
 
-        const systemInstruction = `You are a Senior Academic Radiologist for RadMed. Produce an authentic, structured ACR radiology teaching case. Return strict JSON.`;
+        const systemInstruction = `You are a Senior Academic Radiologist for RadMed. Produce an authentic, structured ACR radiology teaching case. Return strict JSON. Format key pathological terms in bold markdown syntax (e.g. "**Deep sulcus sign**") in keyFindings and teachingPoints.`;
 
         const { text: resultText } = await generateContentWithResilience(ai, {
           contents,
@@ -882,6 +882,162 @@ app.delete('/api/admin/cases/:id', checkAdminAuth, async (req, res) => {
     });
   } catch (err: any) {
     console.error('Error deleting case:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// ADMIN USER & TESTER MANAGEMENT SERVICES
+// ==========================================
+
+// GET /api/admin/users: List all users from Firestore
+app.get('/api/admin/users', checkAdminAuth, async (req, res) => {
+  try {
+    const db = getFirestoreDatabase();
+    if (db) {
+      const snap = await getDocs(collection(db, 'users'));
+      const users: any[] = [];
+      snap.forEach((docSnap) => {
+        users.push({
+          uid: docSnap.id,
+          ...docSnap.data(),
+        });
+      });
+      return res.json({
+        success: true,
+        count: users.length,
+        users,
+      });
+    }
+    return res.json({ success: true, count: 0, users: [] });
+  } catch (err: any) {
+    console.error('Error fetching users in server:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/admin/users: Create or register a tester account
+app.post('/api/admin/users', checkAdminAuth, async (req, res) => {
+  try {
+    const { email, username, password, temporaryPassword, displayName, note, phoneNumber, isPremium, isTester, role } = req.body;
+    if (!email && !username) {
+      return res.status(400).json({ success: false, error: 'Email or Username is required' });
+    }
+    const cleanUsername = username ? username.trim().toLowerCase().replace(/[^a-zA-Z0-9_.-]/g, '') : undefined;
+    const cleanEmail = email
+      ? email.trim().toLowerCase()
+      : `${cleanUsername || 'tester'}@radmed.org`;
+    const uid = 'test_' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30) + '_' + Math.random().toString(36).substring(2, 7);
+    
+    const userDoc = {
+      uid,
+      email: cleanEmail,
+      username: cleanUsername,
+      displayName: displayName || cleanUsername || cleanEmail.split('@')[0],
+      isPremium: isPremium !== undefined ? isPremium : true,
+      isTester: isTester !== undefined ? isTester : true,
+      role: role || 'tester',
+      testAccountNote: note || 'Testing Account',
+      phoneNumber: phoneNumber || null,
+      temporaryPassword: password || temporaryPassword || null,
+      grantedBy: 'Admin API',
+      provider: 'tester_credentials',
+      createdAt: new Date().toISOString(),
+      unlockedAt: new Date().toISOString(),
+    };
+
+    const db = getFirestoreDatabase();
+    if (db) {
+      await setDoc(doc(db, 'users', uid), userDoc);
+    }
+
+    return res.json({
+      success: true,
+      message: `Tester account created for ${cleanEmail} (username: ${cleanUsername || 'none'}).`,
+      user: userDoc,
+    });
+  } catch (err: any) {
+    console.error('Error creating user in server:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/admin/users/:id/tester: Toggle tester access
+app.post('/api/admin/users/:id/tester', checkAdminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isTester, note, grantedBy } = req.body;
+
+    const db = getFirestoreDatabase();
+    if (db) {
+      const userRef = doc(db, 'users', id);
+      await updateDoc(userRef, {
+        isTester: Boolean(isTester),
+        isPremium: Boolean(isTester),
+        role: isTester ? 'tester' : 'user',
+        testAccountNote: isTester ? (note || 'Complimentary testing access') : null,
+        grantedBy: isTester ? (grantedBy || 'Admin') : null,
+        unlockedAt: isTester ? new Date().toISOString() : null,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: isTester ? 'Free testing access granted.' : 'Testing access revoked.',
+    });
+  } catch (err: any) {
+    console.error('Error updating tester status in server:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/admin/users/:id: Delete user account
+app.delete('/api/admin/users/:id', checkAdminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = getFirestoreDatabase();
+    if (db) {
+      await deleteDoc(doc(db, 'users', id));
+    }
+    return res.json({
+      success: true,
+      action: 'deleted',
+      userId: id,
+      message: `User account "${id}" deleted from database.`,
+    });
+  } catch (err: any) {
+    console.error('Error deleting user in server:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/admin/users/bulk-delete: Bulk delete testing accounts
+app.post('/api/admin/users/bulk-delete', checkAdminAuth, async (req, res) => {
+  try {
+    const { uids } = req.body;
+    if (!Array.isArray(uids) || uids.length === 0) {
+      return res.status(400).json({ success: false, error: 'Array of uids is required' });
+    }
+
+    const db = getFirestoreDatabase();
+    let deletedCount = 0;
+    if (db) {
+      for (const uid of uids) {
+        try {
+          await deleteDoc(doc(db, 'users', uid));
+          deletedCount++;
+        } catch {
+          // ignore single item errors
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      deletedCount,
+      message: `Deleted ${deletedCount} testing accounts.`,
+    });
+  } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });

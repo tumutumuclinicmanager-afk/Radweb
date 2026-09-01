@@ -47,7 +47,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onOpenPayment,
 }) => {
   const [tab, setTab] = useState<'login' | 'register'>(defaultTab);
-  const [email, setEmail] = useState('');
+  const [emailOrUsername, setEmailOrUsername] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -61,9 +62,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setError('');
     setSuccessMessage('');
 
-    if (!email || !password) {
-      setError('Please provide both email and password.');
-      return;
+    if (tab === 'register' || isPostPayment) {
+      if (!emailOrUsername || !password) {
+        setError('Please provide an email address and password.');
+        return;
+      }
+      if (!emailOrUsername.includes('@')) {
+        setError('Please provide a valid email address for registration.');
+        return;
+      }
+    } else {
+      if (!emailOrUsername || !password) {
+        setError('Please provide your username/email and password.');
+        return;
+      }
     }
 
     if (password.length < 6) {
@@ -75,14 +87,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       if (tab === 'register' || isPostPayment) {
         const res = await registerWithEmail(
-          email,
+          emailOrUsername,
           password,
           displayName,
-          mpesaReceipt ? { mpesaReceiptNumber: mpesaReceipt, phoneNumber } : undefined
+          mpesaReceipt ? { mpesaReceiptNumber: mpesaReceipt, phoneNumber } : undefined,
+          username
         );
         if (res.success && res.user) {
           onUserChanged(res.user);
-          if (res.user.isPremium) {
+          if (res.user.isTester) {
+            setSuccessMessage('Testing Account activated! Full complimentary access granted.');
+          } else if (res.user.isPremium) {
             setSuccessMessage('Lifetime Pro account created! Your access is permanently saved.');
           } else {
             setSuccessMessage(`Account created! Welcome to the RadMed Free Tier (${FREE_CXR_LIMIT} CXR & ${FREE_CT_LIMIT} CT cases).`);
@@ -94,10 +109,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           setError(res.error || 'Registration failed.');
         }
       } else {
-        const res = await loginWithEmail(email, password);
+        const res = await loginWithEmail(emailOrUsername, password);
         if (res.success && res.user) {
           onUserChanged(res.user);
-          if (res.user.isPremium) {
+          if (res.user.isTester) {
+            setSuccessMessage(`Welcome back, ${res.user.displayName || res.user.username || 'Tester'}! Complimentary Testing Access active.`);
+          } else if (res.user.isPremium) {
             setSuccessMessage(`Welcome back, ${res.user.displayName || 'Doctor'}! Lifetime Pro access restored.`);
           } else {
             setSuccessMessage(`Welcome back, ${res.user.displayName || 'Doctor'}! Signed in to Free Tier.`);
@@ -180,7 +197,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {currentUser.email}
             </p>
 
-            {currentUser.isPremium ? (
+            {currentUser.isTester ? (
+              <div className="mb-6 p-4 rounded-2xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 text-left">
+                <div className="flex items-center gap-2 text-purple-800 dark:text-purple-300 font-bold text-sm mb-1">
+                  <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span>Complimentary Testing Access Active</span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Your testing account has unrestricted free access to all Chest X-rays, Head CT cases, reporting templates, and diagnostic AI modules.
+                </p>
+                {currentUser.username && (
+                  <div className="mt-2 pt-2 border-t border-purple-200 dark:border-purple-800/40 text-[11px] text-purple-700 dark:text-purple-400 font-mono flex items-center justify-between">
+                    <span>Username: @{currentUser.username}</span>
+                    <span className="px-2 py-0.5 rounded-md bg-purple-200 dark:bg-purple-900 font-bold text-[10px]">Tester</span>
+                  </div>
+                )}
+              </div>
+            ) : currentUser.isPremium ? (
               <div className="mb-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-left">
                 <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-sm mb-1">
                   <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -325,38 +358,56 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               )}
 
-              {/* Email Form */}
+              {/* Form */}
               <form onSubmit={handleEmailSubmit} className="space-y-3.5">
                 {(tab === 'register' || isPostPayment) && (
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Full Name / Title (Optional)
-                    </label>
-                    <div className="relative">
-                      <UserIcon className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-                      <input
-                        type="text"
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        placeholder="Dr. Wangechi"
-                        className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                      />
+                  <>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Full Name / Title (Optional)
+                      </label>
+                      <div className="relative">
+                        <UserIcon className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                        <input
+                          type="text"
+                          value={displayName}
+                          onChange={(e) => setDisplayName(e.target.value)}
+                          placeholder="Dr. Wangechi"
+                          className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
                     </div>
-                  </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Username (Optional)
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-2.5 text-xs font-bold text-slate-400">@</span>
+                        <input
+                          type="text"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          placeholder="dr_wangechi"
+                          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </>
                 )}
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Email Address
+                    {tab === 'login' ? 'Email Address or Username' : 'Email Address'}
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                     <input
-                      type="email"
+                      type={tab === 'login' ? 'text' : 'email'}
                       required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="doctor@hospital.org"
+                      value={emailOrUsername}
+                      onChange={(e) => setEmailOrUsername(e.target.value)}
+                      placeholder={tab === 'login' ? 'doctor@hospital.org or username' : 'doctor@hospital.org'}
                       className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     />
                   </div>

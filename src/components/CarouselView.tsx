@@ -16,7 +16,9 @@ import {
 } from 'lucide-react';
 import { MedicalCase, Modality, Category } from '../types';
 import { isCaseLocked, getCaseCategoryIndex, FREE_CXR_LIMIT, FREE_CT_LIMIT } from '../services/paymentService';
+import { sortCasesDeterministically } from '../services/casesService';
 import { getSafeImageUrl, handleImageError } from '../lib/imageUtils';
+import { FormattedText } from './FormattedText';
 
 interface CarouselViewProps {
   cases: MedicalCase[];
@@ -42,16 +44,18 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
   const [currentIndex, setCurrentIndex] = useState(0);
   const carouselRef = useRef<HTMLDivElement>(null);
 
-  // Filter cases based on modality, category, and search
-  const filteredCases = cases.filter(c => {
-    const matchesModality = c.modality === selectedModality;
-    const matchesCategory = selectedCategory === 'All' || c.category === selectedCategory;
-    const matchesSearch = 
-      c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.diagnosis.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.keyFindings.some(f => f.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesModality && matchesCategory && matchesSearch;
-  });
+  // Filter cases based on modality, category, and search, with Normal cases prioritized first
+  const filteredCases = sortCasesDeterministically(
+    cases.filter(c => {
+      const matchesModality = c.modality === selectedModality;
+      const matchesCategory = selectedCategory === 'All' || c.category === selectedCategory;
+      const matchesSearch = 
+        c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.diagnosis.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.keyFindings.some(f => f.toLowerCase().includes(searchQuery.toLowerCase()));
+      return matchesModality && matchesCategory && matchesSearch;
+    })
+  );
 
   const categories: Category[] = ['All', 'Normal', 'Common Pathology', 'Emergency Findings'];
 
@@ -347,7 +351,11 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
                         {c.diagnosis}
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-4">
-                        {locked ? 'Detailed key findings, clinical significance, and reporting template locked. Tap to unlock via M-Pesa.' : c.keyFindings[0]}
+                        {locked ? (
+                          'Detailed key findings, clinical significance, and reporting template locked. Tap to unlock via M-Pesa.'
+                        ) : (
+                          <FormattedText text={c.keyFindings[0]} boldClassName="font-bold text-slate-800 dark:text-slate-200" />
+                        )}
                       </p>
                     </div>
 

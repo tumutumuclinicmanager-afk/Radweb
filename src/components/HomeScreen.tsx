@@ -21,7 +21,9 @@ import {
 } from 'lucide-react';
 import { ActiveView, Modality, MedicalCase } from '../types';
 import { isCaseLocked, FREE_CXR_LIMIT, FREE_CT_LIMIT } from '../services/paymentService';
+import { sortCasesDeterministically } from '../services/casesService';
 import { getSafeImageUrl, handleImageError } from '../lib/imageUtils';
+import { FormattedText } from './FormattedText';
 
 interface HomeScreenProps {
   setActiveView: (view: ActiveView) => void;
@@ -74,8 +76,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   };
 
   const totalCases = cases.length;
-  const cxrCases = cases.filter(c => c.modality === 'chest_xray');
-  const ctCases = cases.filter(c => c.modality === 'head_ct');
+  const cxrCases = sortCasesDeterministically(cases.filter(c => c.modality === 'chest_xray'));
+  const ctCases = sortCasesDeterministically(cases.filter(c => c.modality === 'head_ct'));
   const reviewedCount = reviewedCases.length;
   const progressPercent = totalCases > 0 ? Math.round((reviewedCount / totalCases) * 100) : 0;
 
@@ -392,7 +394,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                           {c.diagnosis}
                         </h3>
                         <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-                          {locked ? 'Clinical key findings & radiological signs locked. Tap to unlock with M-Pesa.' : c.keyFindings[0]}
+                          {locked ? (
+                            'Clinical key findings & radiological signs locked. Tap to unlock with M-Pesa.'
+                          ) : (
+                            <FormattedText text={c.keyFindings[0]} boldClassName="font-bold text-slate-800 dark:text-slate-200" />
+                          )}
                         </p>
                       </div>
                     </div>
@@ -545,7 +551,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                           {c.diagnosis}
                         </h3>
                         <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-                          {locked ? 'Clinical key findings & radiological signs locked. Tap to unlock with M-Pesa.' : c.keyFindings[0]}
+                          {locked ? (
+                            'Clinical key findings & radiological signs locked. Tap to unlock with M-Pesa.'
+                          ) : (
+                            <FormattedText text={c.keyFindings[0]} boldClassName="font-bold text-slate-800 dark:text-slate-200" />
+                          )}
                         </p>
                       </div>
                     </div>

@@ -12,7 +12,9 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { MedicalCase, Modality } from '../types';
+import { sortCasesDeterministically } from '../services/casesService';
 import { getSafeImageUrl, handleImageError } from '../lib/imageUtils';
+import { FormattedText } from './FormattedText';
 
 interface FlashcardsViewProps {
   cases: MedicalCase[];
@@ -34,7 +36,7 @@ export const FlashcardsView: React.FC<FlashcardsViewProps> = ({
   const [knownCards, setKnownCards] = useState<string[]>([]);
 
   useEffect(() => {
-    const filtered = cases.filter(c => c.modality === modality);
+    const filtered = sortCasesDeterministically(cases.filter(c => c.modality === modality));
     setDeck(filtered);
     setCurrentIndex(0);
     setIsFlipped(false);
@@ -219,7 +221,9 @@ export const FlashcardsView: React.FC<FlashcardsViewProps> = ({
                       <span className="w-4 h-4 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5">
                         ✓
                       </span>
-                      <span>{finding}</span>
+                      <span className="leading-relaxed">
+                        <FormattedText text={finding} boldClassName="font-bold text-slate-900 dark:text-white" />
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -230,7 +234,7 @@ export const FlashcardsView: React.FC<FlashcardsViewProps> = ({
                   Teaching Pearl
                 </span>
                 <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                  {currentCard.teachingPoints[0]}
+                  <FormattedText text={currentCard.teachingPoints[0]} boldClassName="font-bold text-purple-950 dark:text-purple-100" />
                 </p>
               </div>
             </div>

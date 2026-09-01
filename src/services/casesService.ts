@@ -101,30 +101,63 @@ export function addDiagnosticLog(
 }
 
 /**
+ * Category Educational Weight:
+ * 0: Normal / Baseline study (Always learn normal anatomy & variants first!)
+ * 1: Common Pathology (e.g. lobar pneumonia, standard fractures, consolidation)
+ * 2: Emergency Findings (e.g. tension pneumothorax, acute intracranial hemorrhage)
+ * 3: Post-Procedural (e.g. chest tubes, lines, intubation)
+ * 4: Other / General
+ */
+export function getCategoryEducationalWeight(category?: string): number {
+  if (!category) return 99;
+  const c = category.trim().toLowerCase();
+  if (c === 'normal' || c.startsWith('normal')) return 0;
+  if (c.includes('common') || c.includes('pathology')) return 1;
+  if (c.includes('emergency') || c.includes('acute') || c.includes('urgent')) return 2;
+  if (c.includes('procedural') || c.includes('post-')) return 3;
+  return 4;
+}
+
+/**
  * Deterministic Sorting Algorithm:
  * Guarantees that regardless of network latency, Firestore partition return order,
- * or browser reload sequence, cases are ALWAYS returned in a stable sequence:
- * 1. Explicit orderIndex values are respected first
- * 2. Next, sorted chronologically by createdAt timestamp
- * 3. Fallback to deterministic string ID comparison
+ * or browser reload sequence, cases are ALWAYS returned in an educationally sound, stable sequence:
+ * 1. Modality grouping (if mixed)
+ * 2. Normal cases ALWAYS start at the beginning of each carousel/deck
+ * 3. Next: Common Pathology -> Emergency Findings -> Post-Procedural
+ * 4. Explicit orderIndex values
+ * 5. Chronologically by createdAt timestamp
+ * 6. Fallback to deterministic string ID comparison
  */
 export function sortCasesDeterministically(cases: MedicalCase[]): MedicalCase[] {
   return [...cases].sort((a, b) => {
-    // 1. Explicit orderIndex
+    // 1. Modality grouping if mixed (chest_xray first, then head_ct)
+    if (a.modality !== b.modality) {
+      return a.modality.localeCompare(b.modality);
+    }
+
+    // 2. Educational Hierarchy: ALWAYS prioritize "Normal" baseline cases first!
+    const weightA = getCategoryEducationalWeight(a.category);
+    const weightB = getCategoryEducationalWeight(b.category);
+    if (weightA !== weightB) {
+      return weightA - weightB;
+    }
+
+    // 3. Explicit orderIndex
     if (a.orderIndex !== undefined && b.orderIndex !== undefined && a.orderIndex !== b.orderIndex) {
       return a.orderIndex - b.orderIndex;
     }
     if (a.orderIndex !== undefined && b.orderIndex === undefined) return -1;
     if (a.orderIndex === undefined && b.orderIndex !== undefined) return 1;
 
-    // 2. CreatedAt timestamps
+    // 4. CreatedAt timestamps
     const aCreated = typeof a.createdAt === 'number' ? a.createdAt : typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : 0;
     const bCreated = typeof b.createdAt === 'number' ? b.createdAt : typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : 0;
     if (aCreated !== bCreated && aCreated > 0 && bCreated > 0) {
       return aCreated - bCreated;
     }
 
-    // 3. Fallback to string ID comparison
+    // 5. Fallback to string ID comparison
     return a.id.localeCompare(b.id);
   });
 }

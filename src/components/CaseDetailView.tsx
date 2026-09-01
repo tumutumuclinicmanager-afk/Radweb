@@ -24,6 +24,7 @@ import {
 import { MedicalCase } from '../types';
 import { isCaseLocked, getCaseCategoryIndex, FREE_CXR_LIMIT, FREE_CT_LIMIT } from '../services/paymentService';
 import { getSafeImageUrl, handleImageError } from '../lib/imageUtils';
+import { FormattedText } from './FormattedText';
 
 interface CaseDetailViewProps {
   currentCase: MedicalCase;
@@ -531,7 +532,9 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                           {currentCase.keyFindings.map((finding, idx) => (
                             <li key={idx} className="flex items-start gap-2.5 bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 text-sm text-slate-700 dark:text-slate-300">
                               <span className="w-2 h-2 rounded-full bg-blue-600 mt-2 flex-shrink-0"></span>
-                              <span>{finding}</span>
+                              <span className="leading-relaxed">
+                                <FormattedText text={finding} boldClassName="font-bold text-slate-950 dark:text-white" />
+                              </span>
                             </li>
                           ))}
                         </ul>
@@ -547,7 +550,7 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                           <AlertCircle className="w-4 h-4 text-amber-600" /> Clinical Significance & Urgency
                         </h3>
                         <p className="text-sm text-amber-900/80 dark:text-amber-300 leading-relaxed">
-                          {currentCase.clinicalSignificance}
+                          <FormattedText text={currentCase.clinicalSignificance} boldClassName="font-bold text-amber-950 dark:text-amber-100" />
                         </p>
                       </div>
 
@@ -558,7 +561,7 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                         <div className="flex flex-wrap gap-2">
                           {currentCase.differentialDiagnosis.map((diff, idx) => (
                             <span key={idx} className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium text-xs border border-slate-200 dark:border-slate-700">
-                              {diff}
+                              <FormattedText text={diff} boldClassName="font-bold text-slate-950 dark:text-white" />
                             </span>
                           ))}
                         </div>
@@ -599,7 +602,9 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                           {currentCase.teachingPoints.map((tp, idx) => (
                             <li key={idx} className="flex items-start gap-3 bg-purple-50/50 dark:bg-purple-950/20 p-4 rounded-2xl border border-purple-100 dark:border-purple-900/40 text-sm text-slate-800 dark:text-slate-200">
                               <span className="font-bold text-purple-600 dark:text-purple-400">0{idx + 1}.</span>
-                              <span>{tp}</span>
+                              <span className="leading-relaxed">
+                                <FormattedText text={tp} boldClassName="font-bold text-purple-950 dark:text-purple-100" />
+                              </span>
                             </li>
                           ))}
                         </ul>
@@ -609,8 +614,8 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                         <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-200 mb-1">
                           <Sparkles className="w-4 h-4" /> CME Expert Pearl Tip
                         </div>
-                        <p className="text-sm font-medium leading-relaxed">
-                          {currentCase.cmeTip}
+                        <p className="text-sm font-medium leading-relaxed text-blue-50">
+                          <FormattedText text={currentCase.cmeTip} boldClassName="font-bold text-white underline decoration-blue-300 underline-offset-2" />
                         </p>
                       </div>
                     </div>

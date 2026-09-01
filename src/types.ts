@@ -57,8 +57,14 @@ export interface PaymentConfig {
 export interface UserProfile {
   uid: string;
   email: string | null;
+  username?: string;
   displayName: string | null;
   isPremium: boolean;
+  isTester?: boolean;
+  role?: 'admin' | 'tester' | 'user';
+  testAccountNote?: string;
+  grantedBy?: string;
+  temporaryPassword?: string;
   mpesaReceiptNumber?: string;
   phoneNumber?: string;
   unlockedAt?: string;

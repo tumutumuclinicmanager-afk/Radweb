@@ -1,6 +1,7 @@
 import { MedicalCase, PaymentConfig, PaymentTransaction } from '../types';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { sortCasesDeterministically } from './casesService';
 
 const STORAGE_KEY = 'radmed_premium_access_token';
 const CONFIG_CACHE_KEY = 'radmed_payment_config_cache';
@@ -470,8 +471,8 @@ export function isCaseLocked(
     return false;
   }
 
-  // Get all cases in the exact same modality
-  const modalityCases = allCases.filter((c) => c.modality === targetCase.modality);
+  // Get all cases in the exact same modality in deterministic sorted order (Normal cases first)
+  const modalityCases = sortCasesDeterministically(allCases.filter((c) => c.modality === targetCase.modality));
   const index = modalityCases.findIndex((c) => c.id === targetCase.id);
 
   // If not found in the list, fallback to free
@@ -486,7 +487,7 @@ export function getCaseModalityIndex(
   targetCase: MedicalCase,
   allCases: MedicalCase[]
 ): { indexInModality: number; totalInModality: number; isFree: boolean; limit: number } {
-  const modalityCases = allCases.filter((c) => c.modality === targetCase.modality);
+  const modalityCases = sortCasesDeterministically(allCases.filter((c) => c.modality === targetCase.modality));
   const index = modalityCases.findIndex((c) => c.id === targetCase.id);
   const limit = targetCase.modality === 'chest_xray' ? FREE_CXR_LIMIT : FREE_CT_LIMIT;
   const isFree = index >= 0 && index < limit;

@@ -39,14 +39,18 @@ import {
   Sliders,
   Wallet,
   Activity,
-  Wifi
+  Wifi,
+  Users
 } from 'lucide-react';
 import { researchCaseWithAI, batchResearchCasesWithAI } from '../services/aiAgentService';
 import { fetchPaymentConfig, testPalPlussApi, updatePaymentConfig } from '../services/paymentService';
 import { verifyAdminPassword, updateAdminPassword } from '../services/adminAuthService';
 import { DiagnosticPanel } from './DiagnosticPanel';
 import { DatabaseTerminal } from './DatabaseTerminal';
+import { UserManagementView } from './UserManagementView';
 import { getSafeImageUrl, handleImageError, compressAndReadImageFile } from '../lib/imageUtils';
+import { FormattedText } from './FormattedText';
+import { FormattedTextarea } from './FormattingToolbar';
 
 interface AdminViewProps {
   cases: MedicalCase[];
@@ -71,8 +75,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState(false);
 
-  // Active Admin Tab: 'ai-agent' | 'manual' | 'automation' | 'payment' | 'security' | 'diagnostics' | 'terminal'
-  const [activeTab, setActiveTab] = useState<'ai-agent' | 'manual' | 'automation' | 'payment' | 'security' | 'diagnostics' | 'terminal'>('ai-agent');
+  // Active Admin Tab: 'ai-agent' | 'manual' | 'automation' | 'users' | 'payment' | 'security' | 'diagnostics' | 'terminal'
+  const [activeTab, setActiveTab] = useState<'ai-agent' | 'manual' | 'automation' | 'users' | 'payment' | 'security' | 'diagnostics' | 'terminal'>('ai-agent');
 
   // --- ADMIN PASSWORD CHANGE STATE ---
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
@@ -836,6 +840,16 @@ export const AdminView: React.FC<AdminViewProps> = ({
           <Edit3 className="w-4 h-4" /> Manual Case Builder {editingCaseId && `(Editing)`}
         </button>
         <button
+          onClick={() => setActiveTab('users')}
+          className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'users'
+              ? 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-md'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Users className="w-4 h-4" /> Users & Testers
+        </button>
+        <button
           onClick={() => setActiveTab('automation')}
           className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'automation'
@@ -887,11 +901,15 @@ export const AdminView: React.FC<AdminViewProps> = ({
         </button>
       </div>
 
-      {/* 2-Column Main Workspace */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Left Column (2 Cols): Active Tab Workspace */}
-        <div className="lg:col-span-2 space-y-6">
+      {/* Main Workspace */}
+      {activeTab === 'users' ? (
+        <UserManagementView currentAdminEmail="admin@radmed.org" />
+      ) : (
+        /* 2-Column Main Workspace */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* Left Column (2 Cols): Active Tab Workspace */}
+          <div className="lg:col-span-2 space-y-6">
 
           {/* --- TAB 1: AI CASE AGENT STUDIO --- */}
           {activeTab === 'ai-agent' && (
@@ -1343,7 +1361,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           {generatedCase.keyFindings.map((f, i) => (
                             <li key={i} className="text-xs text-slate-600 dark:text-slate-300 flex items-start gap-1.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
-                              <span>{f}</span>
+                              <span><FormattedText text={f} /></span>
                             </li>
                           ))}
                         </ul>
@@ -1681,15 +1699,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Key Radiographic Findings (One finding per line)
-                    </label>
-                    <textarea
-                      rows={3}
+                    <FormattedTextarea
+                      label="Key Radiographic Findings (One finding per line)"
                       value={keyFindings}
-                      onChange={(e) => setKeyFindings(e.target.value)}
-                      placeholder="• Loss of gray-white differentiation&#10;• Midline shift of 4mm&#10;• Dense MCA sign"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                      onChange={setKeyFindings}
+                      rows={3}
+                      placeholder="• Loss of **gray-white differentiation**&#10;• **Midline shift** of 4mm&#10;• Hyperdense **MCA sign**"
+                      helpText="Tip: Highlight any word and click Bold or press Ctrl+B to emphasize critical findings."
                     />
                   </div>
 
@@ -1721,15 +1737,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                        Teaching Pearls / High-Yield Points (One per line)
-                      </label>
-                      <textarea
-                        rows={2}
+                      <FormattedTextarea
+                        label="Teaching Pearls / High-Yield Points (One per line)"
                         value={teachingPoints}
-                        onChange={(e) => setTeachingPoints(e.target.value)}
-                        placeholder="Always inspect symmetrical structures&#10;Check bone windows for occult linear fractures"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                        onChange={setTeachingPoints}
+                        rows={2}
+                        placeholder="Always inspect symmetrical structures&#10;Check **bone windows** for occult linear fractures"
+                        helpText="Tip: Format with **bold** for key concepts."
                       />
                     </div>
                   </div>
@@ -2588,6 +2602,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
         </div>
 
       </div>
+      )}
 
       {/* --- CHANGE PASSWORD MODAL --- */}
       {isChangePasswordOpen && (

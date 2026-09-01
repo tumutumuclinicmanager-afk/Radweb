@@ -7,7 +7,7 @@ import {
   User,
   updateProfile,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../lib/firebase';
 import { UserProfile } from '../types';
 import { savePremiumStatus, getStoredPremiumStatus, markUserAsPremium, clearPremiumStatus } from './paymentService';
@@ -69,6 +69,10 @@ export async function syncUserProfileFromFirestore(user: User): Promise<UserProf
     const snap = await getDoc(userRef);
     if (snap.exists()) {
       const data = snap.data() as UserProfile;
+      // If user has tester access, guarantee isPremium is true
+      if (data.isTester) {
+        data.isPremium = true;
+      }
       // If local device had an unlinked M-Pesa receipt and user is now logging in, upgrade their cloud profile
       if (localPrem.isPremium && localPrem.receiptNumber && !data.isPremium) {
         data.isPremium = true;
@@ -81,8 +85,8 @@ export async function syncUserProfileFromFirestore(user: User): Promise<UserProf
         }).catch(() => null);
       }
 
-      if (data.isPremium) {
-        markUserAsPremium(data.mpesaReceiptNumber, data.phoneNumber || undefined);
+      if (data.isPremium || data.isTester) {
+        markUserAsPremium(data.mpesaReceiptNumber || (data.isTester ? 'TESTER_FREE_ACCESS' : undefined), data.phoneNumber || undefined);
       } else {
         clearPremiumStatus();
       }
@@ -90,11 +94,48 @@ export async function syncUserProfileFromFirestore(user: User): Promise<UserProf
       cacheUserProfile(data);
       return data;
     } else {
+      // Check if admin pre-registered this email or username in a placeholder record
+      if (user.email) {
+        try {
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, where('email', '==', user.email.toLowerCase().trim()));
+          const emailSnap = await getDocs(q);
+          if (!emailSnap.empty) {
+            const foundDoc = emailSnap.docs[0];
+            const existingData = foundDoc.data() as UserProfile;
+            const mergedProfile: UserProfile = {
+              ...existingData,
+              uid: user.uid,
+              email: user.email,
+              displayName: user.displayName || existingData.displayName || user.email.split('@')[0],
+              isPremium: existingData.isTester ? true : existingData.isPremium,
+              isTester: existingData.isTester,
+              role: existingData.role || (existingData.isTester ? 'tester' : 'user'),
+              testAccountNote: existingData.testAccountNote,
+              username: existingData.username,
+              unlockedAt: existingData.unlockedAt || new Date().toISOString(),
+            };
+            await setDoc(userRef, mergedProfile);
+            if (foundDoc.id !== user.uid && foundDoc.id.startsWith('test_')) {
+              deleteDoc(foundDoc.ref).catch(() => null);
+            }
+            if (mergedProfile.isPremium || mergedProfile.isTester) {
+              markUserAsPremium(mergedProfile.mpesaReceiptNumber || 'TESTER_FREE_ACCESS', mergedProfile.phoneNumber || undefined);
+            }
+            cacheUserProfile(mergedProfile);
+            return mergedProfile;
+          }
+        } catch (linkErr) {
+          console.warn('Could not query pre-registered tester account:', linkErr);
+        }
+      }
+
       // Create new user profile document (Free by default, or Premium if paid)
       const hasPaid = Boolean(localPrem.isPremium && localPrem.receiptNumber);
       const newProfile: UserProfile = {
         uid: user.uid,
         email: user.email,
+        username: user.email ? user.email.split('@')[0] : undefined,
         displayName: user.displayName || user.email?.split('@')[0] || 'Clinician',
         isPremium: hasPaid,
         mpesaReceiptNumber: hasPaid ? localPrem.receiptNumber : undefined,
@@ -123,6 +164,7 @@ export async function syncUserProfileFromFirestore(user: User): Promise<UserProf
     const fallbackProfile: UserProfile = {
       uid: user.uid,
       email: user.email,
+      username: user.email ? user.email.split('@')[0] : undefined,
       displayName: user.displayName || user.email?.split('@')[0] || 'Clinician',
       isPremium: hasPaid,
       mpesaReceiptNumber: hasPaid ? localPrem.receiptNumber : undefined,
@@ -145,7 +187,8 @@ export async function registerWithEmail(
   email: string,
   pass: string,
   displayName?: string,
-  paymentDetails?: { mpesaReceiptNumber?: string; phoneNumber?: string }
+  paymentDetails?: { mpesaReceiptNumber?: string; phoneNumber?: string },
+  username?: string
 ): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
   try {
     const cred = await createUserWithEmailAndPassword(auth, email.trim(), pass);
@@ -161,11 +204,13 @@ export async function registerWithEmail(
     );
     const mpesaReceipt = paymentDetails?.mpesaReceiptNumber || (hasPaid ? localPrem.receiptNumber : undefined);
     const phone = paymentDetails?.phoneNumber || (hasPaid ? localPrem.phoneNumber : undefined);
+    const cleanUsername = (username || email.split('@')[0]).trim().toLowerCase().replace(/[^a-z0-9_.-]/g, '');
 
     const profile: UserProfile = {
       uid: cred.user.uid,
       email: cred.user.email,
-      displayName: displayName || email.split('@')[0],
+      username: cleanUsername,
+      displayName: displayName || cleanUsername || email.split('@')[0],
       isPremium: hasPaid,
       mpesaReceiptNumber: mpesaReceipt,
       phoneNumber: phone,
@@ -202,19 +247,56 @@ export async function registerWithEmail(
   }
 }
 
-// Log in with email and password
+// Log in with email OR username and password
 export async function loginWithEmail(
-  email: string,
+  identifier: string,
   pass: string
 ): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
+  const trimmed = identifier.trim();
+  if (!trimmed) {
+    return { success: false, error: 'Please enter your username or email address.' };
+  }
+  if (!pass) {
+    return { success: false, error: 'Please enter your password.' };
+  }
+
+  let targetEmail = trimmed;
+
+  // If user entered a username (does not contain @), resolve the email from Firestore
+  if (!targetEmail.includes('@')) {
+    try {
+      const cleanUsername = trimmed.toLowerCase();
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('username', '==', cleanUsername));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const found = snap.docs[0].data() as UserProfile;
+        if (found.email) {
+          targetEmail = found.email;
+        }
+      } else {
+        // Fallback default tester/radmed domain pattern
+        targetEmail = `${cleanUsername}@radmed.org`;
+      }
+    } catch (lookupErr) {
+      console.warn('Username query error, defaulting to domain format:', lookupErr);
+      targetEmail = `${trimmed.toLowerCase()}@radmed.org`;
+    }
+  }
+
   try {
-    const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
+    const cred = await signInWithEmailAndPassword(auth, targetEmail, pass);
     const profile = await syncUserProfileFromFirestore(cred.user);
     return { success: true, user: profile };
   } catch (err: any) {
     let msg = err.message || 'Login failed.';
-    if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-      msg = 'Invalid email or password. Please check your credentials.';
+    if (
+      err.code === 'auth/user-not-found' ||
+      err.code === 'auth/wrong-password' ||
+      err.code === 'auth/invalid-credential' ||
+      err.code === 'auth/invalid-email'
+    ) {
+      msg = 'Invalid username/email or password. Please verify your credentials.';
     }
     return { success: false, error: msg };
   }
