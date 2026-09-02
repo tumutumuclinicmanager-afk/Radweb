@@ -1,6 +1,7 @@
 import { collection, getDocs, doc, setDoc, deleteDoc, getDocFromServer, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { MedicalCase } from '../types';
+import { DEFAULT_BASELINE_CASES } from './baselineCases';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { isDataOrBlobUrl } from '../lib/imageUtils';
 
@@ -265,50 +266,49 @@ export async function fetchCases(): Promise<MedicalCase[]> {
   let remoteFetchSuccess = false;
   let remoteErrorDesc: string | null = null;
 
-  // 1. Attempt Client Firestore Direct Fetch
+  // 1. First Attempt: Backend API (/api/cases) with Resilient Caching
   try {
-    const querySnapshot = await getDocs(collection(db, COLLECTION_NAME));
-    const casesMap = new Map<string, MedicalCase>();
-    querySnapshot.forEach((docSnap) => {
-      const data = docSnap.data() as MedicalCase;
-      if (data && data.id) {
-        casesMap.set(data.id, data);
+    const resp = await fetch('/api/cases');
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.success && Array.isArray(data.cases) && data.cases.length > 0) {
+        remoteCases = data.cases;
+        remoteFetchSuccess = true;
+        diagnosticState.connectionStatus = 'connected';
+        diagnosticState.remoteFirestoreCount = remoteCases.length;
+        addDiagnosticLog('success', 'sync', `Successfully retrieved ${remoteCases.length} cases from backend API /api/cases.`);
       }
-    });
-    remoteCases = Array.from(casesMap.values());
-    remoteFetchSuccess = true;
-    diagnosticState.connectionStatus = 'connected';
-    diagnosticState.remoteFirestoreCount = remoteCases.length;
-
-    addDiagnosticLog('success', 'sync', `Fetched ${remoteCases.length} documents from Firestore collection "${COLLECTION_NAME}".`, {
-      remoteDocumentCount: remoteCases.length,
-      collection: COLLECTION_NAME,
-    });
-  } catch (error: any) {
-    remoteErrorDesc = error?.message || String(error);
-    const isOffline = remoteErrorDesc.includes('offline') || remoteErrorDesc.includes('unavailable');
-    diagnosticState.connectionStatus = isOffline ? 'offline' : 'error';
-    diagnosticState.lastErrorMessage = remoteErrorDesc;
-
-    addDiagnosticLog('warn', 'sync', `Firestore client query notice: ${remoteErrorDesc}. Attempting backend API fallback...`);
+    }
+  } catch (apiErr: any) {
+    console.warn('Backend /api/cases fetch failed:', apiErr);
+    addDiagnosticLog('warn', 'sync', `Backend /api/cases fetch failed: ${apiErr?.message || apiErr}.`);
   }
 
-  // 2. Fallback to /api/cases if Firestore client fetch returned 0 or errored
+  // 2. Secondary Fallback: Direct Client Firestore Fetch (Only if backend API failed or returned 0 cases)
   if (!remoteFetchSuccess || remoteCases.length === 0) {
+    addDiagnosticLog('info', 'sync', 'Reverting to direct Firestore client-side fetch...');
     try {
-      const resp = await fetch('/api/cases');
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.success && Array.isArray(data.cases) && data.cases.length > 0) {
-          remoteCases = data.cases;
-          remoteFetchSuccess = true;
-          diagnosticState.connectionStatus = 'connected';
-          diagnosticState.remoteFirestoreCount = remoteCases.length;
-          addDiagnosticLog('success', 'sync', `Fetched ${remoteCases.length} cases from backend API /api/cases.`);
+      const querySnapshot = await getDocs(collection(db, COLLECTION_NAME));
+      const casesMap = new Map<string, MedicalCase>();
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data() as MedicalCase;
+        if (data && data.id) {
+          casesMap.set(data.id, data);
         }
+      });
+      remoteCases = Array.from(casesMap.values());
+      if (remoteCases.length > 0) {
+        remoteFetchSuccess = true;
+        diagnosticState.connectionStatus = 'connected';
+        diagnosticState.remoteFirestoreCount = remoteCases.length;
+        addDiagnosticLog('success', 'sync', `Fetched ${remoteCases.length} documents directly from Firestore.`);
       }
-    } catch (apiErr) {
-      console.warn('Backend /api/cases fetch notice:', apiErr);
+    } catch (error: any) {
+      remoteErrorDesc = error?.message || String(error);
+      const isOffline = remoteErrorDesc.includes('offline') || remoteErrorDesc.includes('unavailable');
+      diagnosticState.connectionStatus = isOffline ? 'offline' : 'error';
+      diagnosticState.lastErrorMessage = remoteErrorDesc;
+      addDiagnosticLog('warn', 'sync', `Direct Firestore client fetch failed: ${remoteErrorDesc}`);
     }
   }
 
@@ -327,17 +327,48 @@ export async function fetchCases(): Promise<MedicalCase[]> {
   diagnosticState.localCacheCount = localCustomCases.length;
   diagnosticState.staticSeedCount = 0;
 
-  // 4. Authoritative Source of Truth Selection:
+  // 4. Authoritative Source of Truth Selection with Intelligent Merge:
   let finalCases: MedicalCase[] = [];
 
-  if (remoteFetchSuccess) {
-    // When online, Firestore is the pure authoritative source of truth.
-    // We NEVER resurrect cases that do not exist in Firestore (preventing deleted or stale demo cases from returning).
-    finalCases = remoteCases;
+  if (remoteFetchSuccess && remoteCases.length > 0) {
+    // Merge remote cases with local custom cases so newly added cases/images are NEVER lost upon refresh
+    const mergedMap = new Map<string, MedicalCase>();
+    
+    // First, populate with remote cases
+    remoteCases.forEach(c => {
+      if (c && c.id) mergedMap.set(c.id, c);
+    });
+
+    // Then, overlay local cases if they are newer, contain custom local base64/blob images, or don't exist remotely
+    localCustomCases.forEach(lc => {
+      if (lc && lc.id) {
+        const remote = mergedMap.get(lc.id);
+        if (!remote) {
+          // Keep local custom cases not yet synced or deleted from remote
+          mergedMap.set(lc.id, lc);
+        } else {
+          const remoteUpdated = typeof remote.updatedAt === 'number' ? remote.updatedAt : typeof remote.updatedAt === 'string' ? new Date(remote.updatedAt).getTime() : 0;
+          const localUpdated = typeof lc.updatedAt === 'number' ? lc.updatedAt : typeof lc.updatedAt === 'string' ? new Date(lc.updatedAt).getTime() : 0;
+          
+          // Prefer local if it was edited/updated more recently, or has a custom uploaded image (base64) while remote is placeholder
+          if (localUpdated > remoteUpdated || (lc.imageUrl?.startsWith('data:') && !remote.imageUrl?.startsWith('data:'))) {
+            mergedMap.set(lc.id, lc);
+          }
+        }
+      }
+    });
+
+    finalCases = Array.from(mergedMap.values());
   } else {
-    // When offline / network unavailable, fall back to local cached cases.
-    finalCases = localCustomCases;
-    addDiagnosticLog('info', 'sync', `Using local offline cache (${localCustomCases.length} cases) as network fallback.`);
+    // When offline, network unavailable, or Firestore is empty/quota-blocked:
+    if (localCustomCases.length > 0) {
+      finalCases = localCustomCases;
+      addDiagnosticLog('info', 'sync', `Using local offline cache (${localCustomCases.length} cases) as network fallback.`);
+    } else {
+      finalCases = DEFAULT_BASELINE_CASES;
+      addDiagnosticLog('warn', 'sync', `Firestore/Backend empty or unavailable (e.g. Quota Exceeded). Falling back to ${DEFAULT_BASELINE_CASES.length} high-yield static baseline cases.`);
+      diagnosticState.staticSeedCount = DEFAULT_BASELINE_CASES.length;
+    }
   }
 
   // 5. Apply Deterministic & Stable Sorting

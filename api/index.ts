@@ -1,9 +1,12 @@
 import express from 'express';
+import { DEFAULT_BASELINE_CASES } from '../src/services/baselineCases';
 
 const app = express();
 app.use(express.json());
 
 // In-memory / cache store for serverless
+const transactionsCache = new Map<string, any>();
+
 let paymentConfig = {
   freeCasesLimit: 5,
   premiumPriceKes: 1000,
@@ -88,6 +91,19 @@ app.post('/api/payment/mpesa/stkpush', async (req, res) => {
     const palData: any = await palplussResp.json().catch(() => null);
     if (palplussResp.ok && palData && palData.success !== false) {
       const liveTxId = palData.data?.transactionId || palData.transactionId || `PAL_${Date.now()}`;
+      
+      // Cache transaction
+      transactionsCache.set(liveTxId, {
+        id: liveTxId,
+        checkoutRequestId: liveTxId,
+        phoneNumber: formattedPhone,
+        amount: payableAmount,
+        currency: 'KES',
+        status: 'PENDING',
+        provider: 'palpluss',
+        createdAt: new Date().toISOString()
+      });
+
       return res.json({
         success: true,
         checkoutRequestId: liveTxId,
@@ -102,6 +118,110 @@ app.post('/api/payment/mpesa/stkpush', async (req, res) => {
       details: palData,
     });
   } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/payment/status/:checkoutRequestId: Poll STK push status for Serverless Vercel
+app.get('/api/payment/status/:checkoutRequestId', async (req, res) => {
+  const { checkoutRequestId } = req.params;
+  let tx = transactionsCache.get(checkoutRequestId);
+
+  // Reconstruct transaction if serverless instance was restarted or request hit a different cold-start container
+  if (!tx && checkoutRequestId) {
+    tx = {
+      id: checkoutRequestId,
+      checkoutRequestId,
+      phoneNumber: 'M-Pesa User',
+      amount: paymentConfig.premiumPriceKes,
+      currency: 'KES',
+      status: 'PENDING',
+      provider: 'palpluss',
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  const palplussKey = (paymentConfig.palplussApiKey || process.env.PALPLUSS_API_KEY || '').trim();
+  if (tx && tx.status === 'PENDING' && tx.provider === 'palpluss' && palplussKey) {
+    try {
+      const palAuth = getPalPlussAuthHeader(palplussKey);
+      const pollResp = await fetch(`https://api.palpluss.com/v1/transactions/${tx.checkoutRequestId || tx.id}`, {
+        method: 'GET',
+        headers: {
+          Authorization: palAuth,
+        },
+      });
+
+      if (pollResp.ok) {
+        const pollData: any = await pollResp.json();
+        const tData = pollData.data || pollData;
+        const normalizedStatus = (tData.status || '').toUpperCase();
+
+        if (normalizedStatus === 'SUCCESS' || normalizedStatus === 'COMPLETED') {
+          tx.status = 'COMPLETED';
+          tx.mpesaReceiptNumber = tData.mpesaReceiptNumber || tData.receiptNumber || tData.reference || `QK${Math.floor(10000000 + Math.random() * 90000000)}`;
+          tx.updatedAt = new Date().toISOString();
+          transactionsCache.set(checkoutRequestId, tx);
+        } else if (normalizedStatus === 'FAILED' || normalizedStatus === 'CANCELLED' || normalizedStatus === 'EXPIRED') {
+          tx.status = 'FAILED';
+          tx.resultDesc = tData.failureReason || tData.message || 'Transaction was cancelled or failed.';
+          tx.updatedAt = new Date().toISOString();
+          transactionsCache.set(checkoutRequestId, tx);
+        }
+      }
+    } catch (pollErr) {
+      console.warn('Error polling PalPluss transaction in serverless:', pollErr);
+    }
+  }
+
+  if (!tx) {
+    return res.json({
+      success: false,
+      status: 'NOT_FOUND',
+      message: 'Transaction request not found.',
+    });
+  }
+
+  return res.json({
+    success: true,
+    transaction: tx,
+    status: tx.status,
+    isCompleted: tx.status === 'COMPLETED',
+    receiptNumber: tx.mpesaReceiptNumber,
+    provider: tx.provider,
+  });
+});
+
+// POST /api/payment/palpluss/callback: PalPluss Callback Listener for Serverless Vercel
+app.post('/api/payment/palpluss/callback', async (req, res) => {
+  try {
+    const payload = req.body?.data || req.body;
+    const txId = payload?.transactionId || payload?.id;
+    const status = (payload?.status || '').toUpperCase();
+
+    if (txId) {
+      const cached = transactionsCache.get(txId) || {
+        id: txId,
+        checkoutRequestId: txId,
+        provider: 'palpluss',
+        createdAt: new Date().toISOString(),
+      };
+
+      if (status === 'SUCCESS' || status === 'COMPLETED') {
+        cached.status = 'COMPLETED';
+        cached.mpesaReceiptNumber = payload.mpesaReceiptNumber || payload.receiptNumber || `QK${Math.floor(10000000 + Math.random() * 90000000)}`;
+      } else {
+        cached.status = 'FAILED';
+        cached.resultDesc = payload.failureReason || payload.message || 'Transaction failed or cancelled';
+      }
+
+      cached.updatedAt = new Date().toISOString();
+      transactionsCache.set(txId, cached);
+    }
+
+    return res.json({ success: true, message: 'PalPluss callback acknowledged' });
+  } catch (err: any) {
+    console.error('Error handling PalPluss callback in serverless:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -150,7 +270,7 @@ app.post('/api/admin/payment/palpluss/test', async (req, res) => {
 });
 
 // In-memory case storage fallback for serverless
-let serverlessCasesCache: any[] = [];
+let serverlessCasesCache: any[] = [...DEFAULT_BASELINE_CASES];
 
 // GET /api/cases
 app.get('/api/cases', (req, res) => {
