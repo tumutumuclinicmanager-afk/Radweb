@@ -4,9 +4,35 @@ import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, doc, getDocs, setDoc, updateDoc, deleteDoc, Firestore } from 'firebase/firestore';
+import { getFirestore, collection, doc, getDocs, setDoc, updateDoc, deleteDoc, Firestore, setLogLevel } from 'firebase/firestore';
 import dotenv from 'dotenv';
 import { DEFAULT_BASELINE_CASES } from './src/services/baselineCases.js';
+
+// Suppress benign internal Firestore client SDK connection stream warnings when connections go idle on the server
+const originalConsoleError = console.error;
+const originalConsoleWarn = console.warn;
+
+console.error = function (...args: any[]) {
+  const msg = args.map(arg => typeof arg === 'string' ? arg : (arg && arg.message ? arg.message : String(arg))).join(' ');
+  if (msg.includes('Disconnecting idle stream') || msg.includes('GrpcConnection RPC') || msg.includes('timed out waiting for new targets')) {
+    return;
+  }
+  originalConsoleError.apply(console, args);
+};
+
+console.warn = function (...args: any[]) {
+  const msg = args.map(arg => typeof arg === 'string' ? arg : (arg && arg.message ? arg.message : String(arg))).join(' ');
+  if (msg.includes('Disconnecting idle stream') || msg.includes('GrpcConnection RPC') || msg.includes('timed out waiting for new targets')) {
+    return;
+  }
+  originalConsoleWarn.apply(console, args);
+};
+
+try {
+  setLogLevel('error');
+} catch (e) {
+  // Gracefully skip if setting log level fails
+}
 
 dotenv.config();
 
