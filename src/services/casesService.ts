@@ -8,6 +8,39 @@ import { isDataOrBlobUrl } from '../lib/imageUtils';
 const COLLECTION_NAME = 'cases';
 const LOCAL_STORAGE_KEY = 'radmed_custom_cases_cache';
 
+/**
+ * Shows an elegant temporary toast notification when Firestore is offline or in quota-blocked mode.
+ */
+function showOfflineToast() {
+  if (typeof document === 'undefined') return;
+  
+  // Avoid duplicate notifications
+  const existingToast = document.getElementById('offline-mode-toast');
+  if (existingToast) return;
+
+  const toast = document.createElement('div');
+  toast.id = 'offline-mode-toast';
+  toast.className = 'fixed bottom-5 right-5 z-[9999] flex items-center gap-3 bg-amber-500 text-white px-4 py-3 rounded-xl shadow-lg border border-amber-600 transition-all duration-300 transform translate-y-0 opacity-100';
+  
+  toast.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><line x1="2" x2="22" y1="2" y2="22"/><path d="M8.5 8.5a5 5 0 0 1 7 0"/><path d="M16.5 16.5a10 10 0 0 0-9-9"/><path d="M12 12A1 1 0 0 0 12 12Z"/></svg>
+    <div class="flex flex-col">
+      <span class="font-semibold text-sm">Offline Mode Active</span>
+      <span class="text-xs text-amber-50">Database quota limit reached. Loading cases from local cache.</span>
+    </div>
+  `;
+
+  document.body.appendChild(toast);
+
+  // Transition out and remove
+  setTimeout(() => {
+    toast.className = 'fixed bottom-5 right-5 z-[9999] flex items-center gap-3 bg-amber-500 text-white px-4 py-3 rounded-xl shadow-lg border border-amber-600 transition-all duration-300 transform translate-y-10 opacity-0';
+    setTimeout(() => {
+      toast.remove();
+    }, 300);
+  }, 6000);
+}
+
 export interface DiagnosticLogEntry {
   id: string;
   timestamp: number; // raw epoch milliseconds
@@ -265,6 +298,7 @@ export async function fetchCases(): Promise<MedicalCase[]> {
   let remoteCases: MedicalCase[] = [];
   let remoteFetchSuccess = false;
   let remoteErrorDesc: string | null = null;
+  let isQuotaExceeded = false;
 
   // 1. First Attempt: Backend API (/api/cases) with Resilient Caching
   try {
@@ -277,15 +311,31 @@ export async function fetchCases(): Promise<MedicalCase[]> {
         diagnosticState.connectionStatus = 'connected';
         diagnosticState.remoteFirestoreCount = remoteCases.length;
         addDiagnosticLog('success', 'sync', `Successfully retrieved ${remoteCases.length} cases from backend API /api/cases.`);
+      } else if (data.error && (data.error.toLowerCase().includes('quota') || data.error.toLowerCase().includes('exceeded'))) {
+        isQuotaExceeded = true;
+        remoteErrorDesc = data.error;
       }
+    } else {
+      try {
+        const data = await resp.json();
+        if (data.error && (data.error.toLowerCase().includes('quota') || data.error.toLowerCase().includes('exceeded'))) {
+          isQuotaExceeded = true;
+          remoteErrorDesc = data.error;
+        }
+      } catch {}
     }
   } catch (apiErr: any) {
     console.warn('Backend /api/cases fetch failed:', apiErr);
     addDiagnosticLog('warn', 'sync', `Backend /api/cases fetch failed: ${apiErr?.message || apiErr}.`);
+    const errMsg = apiErr?.message || String(apiErr);
+    if (errMsg.toLowerCase().includes('quota') || errMsg.toLowerCase().includes('exceeded')) {
+      isQuotaExceeded = true;
+      remoteErrorDesc = errMsg;
+    }
   }
 
-  // 2. Secondary Fallback: Direct Client Firestore Fetch (Only if backend API failed or returned 0 cases)
-  if (!remoteFetchSuccess || remoteCases.length === 0) {
+  // 2. Secondary Fallback: Direct Client Firestore Fetch (Only if backend API failed or returned 0 cases, and we have not already verified quota is exceeded)
+  if (!isQuotaExceeded && (!remoteFetchSuccess || remoteCases.length === 0)) {
     addDiagnosticLog('info', 'sync', 'Reverting to direct Firestore client-side fetch...');
     try {
       const querySnapshot = await getDocs(collection(db, COLLECTION_NAME));
@@ -306,10 +356,19 @@ export async function fetchCases(): Promise<MedicalCase[]> {
     } catch (error: any) {
       remoteErrorDesc = error?.message || String(error);
       const isOffline = remoteErrorDesc.includes('offline') || remoteErrorDesc.includes('unavailable');
+      const hasQuotaWord = remoteErrorDesc.toLowerCase().includes('quota') || remoteErrorDesc.toLowerCase().includes('exceeded');
+      if (hasQuotaWord) {
+        isQuotaExceeded = true;
+      }
       diagnosticState.connectionStatus = isOffline ? 'offline' : 'error';
       diagnosticState.lastErrorMessage = remoteErrorDesc;
       addDiagnosticLog('warn', 'sync', `Direct Firestore client fetch failed: ${remoteErrorDesc}`);
     }
+  }
+
+  // If a quota error was encountered during the sync process, show the elegant toast notification
+  if (isQuotaExceeded) {
+    showOfflineToast();
   }
 
   // 3. Load locally cached custom cases from localStorage

@@ -96,9 +96,24 @@ export default function App() {
   };
 
   const handleRefreshCases = async () => {
-    const fetched = await fetchCases();
-    const sorted = sortCasesDeterministically(fetched);
-    setCases(sorted);
+    try {
+      const fetched = await fetchCases();
+      const sorted = sortCasesDeterministically(fetched);
+      setCases(sorted);
+      // Explicitly save the results to localStorage after successfully fetching cases
+      localStorage.setItem('radmed_custom_cases_cache', JSON.stringify(sorted));
+    } catch (err) {
+      console.warn("Failed to retrieve cases on startup:", err);
+      // Display content immediately using current local cache if network/API fails
+      try {
+        const cached = localStorage.getItem('radmed_custom_cases_cache');
+        if (cached) {
+          setCases(sortCasesDeterministically(JSON.parse(cached)));
+        }
+      } catch (cacheErr) {
+        console.error("Local storage initialization cache load failed:", cacheErr);
+      }
+    }
   };
 
   useEffect(() => {
