@@ -149,4 +149,84 @@ app.post('/api/admin/payment/palpluss/test', async (req, res) => {
   });
 });
 
+// In-memory case storage fallback for serverless
+let serverlessCasesCache: any[] = [];
+
+// GET /api/cases
+app.get('/api/cases', (req, res) => {
+  res.json({
+    success: true,
+    count: serverlessCasesCache.length,
+    cases: serverlessCasesCache,
+  });
+});
+
+// POST /api/cases
+app.post('/api/cases', (req, res) => {
+  const newCase = req.body;
+  if (!newCase || !newCase.id) {
+    return res.status(400).json({ success: false, error: 'Invalid case payload' });
+  }
+  const index = serverlessCasesCache.findIndex((c) => c.id === newCase.id);
+  if (index >= 0) {
+    serverlessCasesCache[index] = { ...serverlessCasesCache[index], ...newCase, updatedAt: Date.now() };
+  } else {
+    serverlessCasesCache.unshift({ ...newCase, createdAt: newCase.createdAt || Date.now(), updatedAt: Date.now() });
+  }
+  res.json({ success: true, case: newCase, count: serverlessCasesCache.length });
+});
+
+// DELETE /api/admin/cases/:id
+app.delete('/api/admin/cases/:id', (req, res) => {
+  const { id } = req.params;
+  serverlessCasesCache = serverlessCasesCache.filter((c) => c.id !== id);
+  res.json({ success: true, message: `Case ${id} deleted.` });
+});
+
+// POST /api/auth/login
+app.post('/api/auth/login', (req, res) => {
+  const { email, password, username } = req.body;
+  const identifier = (email || username || '').trim().toLowerCase();
+
+  // Admin account
+  if (
+    (identifier === 'admin@radmed.org' || identifier === 'admin') &&
+    (password === 'Admin@2026!' || password === 'admin')
+  ) {
+    return res.json({
+      success: true,
+      user: {
+        uid: 'radmed_super_admin_001',
+        email: 'admin@radmed.org',
+        displayName: 'RadMed Lead Radiologist (Admin)',
+        role: 'admin',
+        isPremium: true,
+        isTester: false,
+        provider: 'credentials',
+      },
+    });
+  }
+
+  // Tester demo accounts
+  if (
+    (identifier === 'tester@radmed.org' || identifier === 'demo@radmed.org' || identifier === 'tester') &&
+    (password === 'Tester@2026!' || password === 'demo1234' || password === 'tester')
+  ) {
+    return res.json({
+      success: true,
+      user: {
+        uid: 'radmed_tester_001',
+        email: identifier.includes('@') ? identifier : `${identifier}@radmed.org`,
+        displayName: 'Radiology Resident Tester',
+        role: 'tester',
+        isPremium: true,
+        isTester: true,
+        provider: 'credentials',
+      },
+    });
+  }
+
+  return res.status(401).json({ success: false, error: 'Invalid email or password.' });
+});
+
 export default app;

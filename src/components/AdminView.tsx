@@ -302,7 +302,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
     if (file) {
       setAiScanMimeType(file.type || 'image/jpeg');
       try {
-        const compressedBase64 = await compressAndReadImageFile(file, 1920, 0.88);
+        const compressedBase64 = await compressAndReadImageFile(file, 1280, 0.80);
         setAiScanBase64(compressedBase64);
       } catch (err) {
         console.error('Failed to compress scan image:', err);
@@ -419,7 +419,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const compressedBase64 = await compressAndReadImageFile(file, 1920, 0.88);
+        const compressedBase64 = await compressAndReadImageFile(file, 1280, 0.80);
         setImageUrl(compressedBase64);
       } catch (err) {
         console.error('Failed to read image file:', err);
@@ -431,7 +431,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const compressedBase64 = await compressAndReadImageFile(file, 1920, 0.88);
+        const compressedBase64 = await compressAndReadImageFile(file, 1024, 0.78);
         setCaseScenarioImageUrl(compressedBase64);
       } catch (err) {
         console.error('Failed to read scenario image file:', err);
@@ -443,7 +443,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const compressedBase64 = await compressAndReadImageFile(file, 1920, 0.88);
+        const compressedBase64 = await compressAndReadImageFile(file, 1024, 0.78);
         setNewGalleryUrl(compressedBase64);
       } catch (err) {
         console.error('Failed to read gallery image file:', err);
@@ -545,6 +545,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
       caseScenarioImageCaption: caseScenarioImageCaption.trim() || undefined,
       caseExample: caseExample.trim() || undefined,
       galleryImages: galleryImages.length > 0 ? galleryImages : undefined,
+      updatedAt: Date.now(),
     };
 
     onAddCase(updatedCase);

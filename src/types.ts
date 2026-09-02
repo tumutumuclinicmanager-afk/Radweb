@@ -20,6 +20,7 @@ export interface MedicalCase {
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
   orderIndex?: number;
   createdAt?: number | string;
+  updatedAt?: number | string;
   galleryImages?: { url: string; caption: string }[];
   caseScenario?: string;
   caseScenarioImageUrl?: string;

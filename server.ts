@@ -677,6 +677,51 @@ app.get('/api/admin/n8n-info', (req, res) => {
   });
 });
 
+// GET /api/cases: Public/App endpoint to retrieve all cases from Firestore
+app.get('/api/cases', async (req, res) => {
+  try {
+    const db = getFirestoreDatabase();
+    if (db) {
+      const snap = await getDocs(collection(db, 'cases'));
+      const cases: any[] = [];
+      snap.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data && data.id) {
+          cases.push(data);
+        }
+      });
+      return res.json({ success: true, count: cases.length, cases });
+    }
+    return res.json({ success: true, count: 0, cases: [] });
+  } catch (err: any) {
+    console.error('Error in /api/cases GET:', err);
+    return res.status(500).json({ success: false, error: err.message, cases: [] });
+  }
+});
+
+// POST /api/cases: Save/update a single case directly to Firestore
+app.post('/api/cases', async (req, res) => {
+  try {
+    if (!req.body || typeof req.body !== 'object') {
+      return res.status(400).json({ success: false, error: 'Invalid case body' });
+    }
+    const normalizedCase = normalizeMedicalCase(req.body);
+    const db = getFirestoreDatabase();
+    if (db) {
+      await setDoc(doc(db, 'cases', normalizedCase.id), normalizedCase);
+    }
+    return res.json({
+      success: true,
+      case: normalizedCase,
+      message: `Case "${normalizedCase.title}" persisted successfully.`,
+      firestorePersisted: !!db,
+    });
+  } catch (err: any) {
+    console.error('Error in /api/cases POST:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET /api/admin/cases: List all cases stored in Firestore
 app.get('/api/admin/cases', checkAdminAuth, async (req, res) => {
   try {

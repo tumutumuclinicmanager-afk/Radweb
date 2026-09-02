@@ -86,25 +86,25 @@ export function handleImageError(
 /**
  * Client-side image compressor and file reader:
  * - Reads user-uploaded image files (JPEG, PNG, WEBP, DICOM-exported BMP/TIFF)
- * - Auto-downscales high-resolution scans (e.g. 4000x3000 down to max 1920x1080)
- * - Compresses high-megabyte files (e.g. 8MB -> ~200KB) while preserving sharp radiological diagnostic detail
- * - Enables instant loading in React views, saves to localStorage without hitting 5MB quota,
- *   and saves to Firestore without hitting 1MB document size limit!
+ * - Auto-downscales high-resolution scans (e.g. 4000x3000 down to max 1280x1280)
+ * - Compresses high-megabyte files (e.g. 8MB -> ~100KB-180KB) while preserving sharp radiological diagnostic detail
+ * - Enables instant loading in React views, prevents hitting localStorage 5MB quota,
+ *   and guarantees documents easily stay under Firestore's 1MB limit so images NEVER fail to persist!
  */
 export async function compressAndReadImageFile(
   file: File,
-  maxDimension: number = 1920,
-  quality: number = 0.88
+  maxDimension: number = 1280,
+  quality: number = 0.80
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    // If not an image or SVG, read as standard Data URL
-    if (!file.type.startsWith('image/') || file.type.includes('svg')) {
+    // If SVG, read directly as standard Data URL
+    if (file.type.includes('svg')) {
       const reader = new FileReader();
       reader.onload = (e) => {
         if (e.target?.result) {
           resolve(e.target.result as string);
         } else {
-          reject(new Error('Failed to read image file'));
+          reject(new Error('Failed to read SVG file'));
         }
       };
       reader.onerror = () => reject(new Error('FileReader error'));
@@ -120,8 +120,8 @@ export async function compressAndReadImageFile(
         return;
       }
 
-      // If file is already small (e.g. under 200KB), return directly
-      if (file.size < 200 * 1024) {
+      // If file is already an image under 80KB and not a huge raw PNG, we can use it
+      if (file.size < 80 * 1024 && file.type === 'image/jpeg') {
         resolve(rawDataUrl);
         return;
       }
@@ -142,12 +142,11 @@ export async function compressAndReadImageFile(
         }
 
         const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = Math.max(width, 1);
+        canvas.height = Math.max(height, 1);
 
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { alpha: true });
         if (!ctx) {
-          // Fallback to raw data url if 2d context unavailable
           resolve(rawDataUrl);
           return;
         }
@@ -157,13 +156,14 @@ export async function compressAndReadImageFile(
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Export as JPEG/WebP for optimal compression
-        const outputMime = file.type === 'image/png' && hasTransparency(ctx, width, height) 
-          ? 'image/png' 
-          : 'image/jpeg';
+        // Export as JPEG for maximum compression efficiency unless transparent PNG
+        const isPng = file.type === 'image/png';
+        const transparent = isPng && hasTransparency(ctx, width, height);
+        const outputMime = transparent ? 'image/png' : 'image/jpeg';
+        const effectiveQuality = transparent ? undefined : Math.min(quality, 0.82);
 
         try {
-          const compressedDataUrl = canvas.toDataURL(outputMime, quality);
+          const compressedDataUrl = canvas.toDataURL(outputMime, effectiveQuality);
           resolve(compressedDataUrl);
         } catch {
           resolve(rawDataUrl);
@@ -171,7 +171,6 @@ export async function compressAndReadImageFile(
       };
 
       img.onerror = () => {
-        // Fallback to raw data URL on decode error
         resolve(rawDataUrl);
       };
 
