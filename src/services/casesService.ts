@@ -327,49 +327,17 @@ export async function fetchCases(): Promise<MedicalCase[]> {
   diagnosticState.localCacheCount = localCustomCases.length;
   diagnosticState.staticSeedCount = 0;
 
-  // 4. Intelligent Two-Way Merge:
-  // Build a merged map combining remoteCases and localCustomCases so unsynced local edits/images are preserved
-  const mergedMap = new Map<string, MedicalCase>();
+  // 4. Authoritative Source of Truth Selection:
+  let finalCases: MedicalCase[] = [];
 
-  // Add all remote cases first
-  for (const rc of remoteCases) {
-    if (rc && rc.id) {
-      mergedMap.set(rc.id, rc);
-    }
-  }
-
-  // Merge in local cases: if a local case has a newer updatedAt or is missing from remote, keep the local version
-  const missingFromRemote: MedicalCase[] = [];
-  for (const lc of localCustomCases) {
-    if (!lc || !lc.id) continue;
-    const existingRemote = mergedMap.get(lc.id);
-    if (!existingRemote) {
-      mergedMap.set(lc.id, lc);
-      missingFromRemote.push(lc);
-    } else {
-      const localUpdated = (lc as any).updatedAt || (typeof lc.createdAt === 'number' ? lc.createdAt : 0);
-      const remoteUpdated = (existingRemote as any).updatedAt || (typeof existingRemote.createdAt === 'number' ? existingRemote.createdAt : 0);
-      if (localUpdated > remoteUpdated) {
-        mergedMap.set(lc.id, lc);
-        missingFromRemote.push(lc);
-      }
-    }
-  }
-
-  const finalCases = Array.from(mergedMap.values());
-
-  // Background auto-sync for missing local cases to Firestore
-  if (missingFromRemote.length > 0) {
-    setTimeout(async () => {
-      for (const item of missingFromRemote) {
-        try {
-          const sanitized = sanitizeCaseForStorage(item);
-          await setDoc(doc(db, COLLECTION_NAME, sanitized.id), sanitized);
-        } catch (e) {
-          // silently catch background sync
-        }
-      }
-    }, 100);
+  if (remoteFetchSuccess) {
+    // When online, Firestore is the pure authoritative source of truth.
+    // We NEVER resurrect cases that do not exist in Firestore (preventing deleted or stale demo cases from returning).
+    finalCases = remoteCases;
+  } else {
+    // When offline / network unavailable, fall back to local cached cases.
+    finalCases = localCustomCases;
+    addDiagnosticLog('info', 'sync', `Using local offline cache (${localCustomCases.length} cases) as network fallback.`);
   }
 
   // 5. Apply Deterministic & Stable Sorting
@@ -484,6 +452,76 @@ export async function deleteCaseFromFirestore(caseId: string): Promise<void> {
   }
 
   notifySubscribers();
+}
+
+/**
+ * Purges demo/sample cases (e.g. case-cxr-*, case-ct-*, baseline-*) from both Firestore and local storage.
+ */
+export async function purgeSampleCases(): Promise<{
+  success: boolean;
+  purgedCount: number;
+  purgedIds: string[];
+}> {
+  addDiagnosticLog('info', 'sync', 'Initiating purge of sample/demo cases...');
+  
+  const sampleIdPatterns = [
+    /^case-cxr-/i,
+    /^case-ct-/i,
+    /^baseline-/i,
+    /^sample-/i,
+    /^demo-/i,
+    /^mock-/i,
+  ];
+
+  let currentCases: MedicalCase[] = [];
+  try {
+    const querySnapshot = await getDocs(collection(db, COLLECTION_NAME));
+    querySnapshot.forEach((docSnap) => {
+      const data = docSnap.data() as MedicalCase;
+      if (data && data.id) {
+        currentCases.push(data);
+      }
+    });
+  } catch (e) {
+    const savedLocal = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (savedLocal) currentCases = JSON.parse(savedLocal);
+  }
+
+  const casesToPurge = currentCases.filter(c => 
+    sampleIdPatterns.some(pattern => pattern.test(c.id))
+  );
+
+  const purgedIds: string[] = [];
+  for (const c of casesToPurge) {
+    try {
+      await deleteDoc(doc(db, COLLECTION_NAME, c.id));
+      purgedIds.push(c.id);
+    } catch (err) {
+      console.warn(`Could not delete sample case ${c.id}:`, err);
+    }
+  }
+
+  // Also clean local storage cache
+  try {
+    const savedLocal = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (savedLocal) {
+      const parsed: MedicalCase[] = JSON.parse(savedLocal);
+      const cleaned = parsed.filter(c => !sampleIdPatterns.some(pattern => pattern.test(c.id)));
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cleaned));
+      diagnosticState.localCacheCount = cleaned.length;
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  addDiagnosticLog('success', 'sync', `Purged ${purgedIds.length} sample/demo cases from database and cache.`, { purgedIds });
+  notifySubscribers();
+
+  return {
+    success: true,
+    purgedCount: purgedIds.length,
+    purgedIds,
+  };
 }
 
 /**
@@ -646,7 +684,7 @@ export async function executeDatabaseCliCommand(
           '  stats                      Display database collections, case count & storage metrics',
           '  sort-order                 Inspect deterministic sort index values across all cases',
           '  ping                       Probe Firestore server with live roundtrip latency measurement',
-          '  reseed                     Reseed all 20 curated baseline cases with canonical orderIndex',
+          '  purge, purge-samples       Purge all fake/sample demo cases from Firestore & cache',
           '  clear-cache                Clear local browser cache to force fresh remote sync',
           '  export json                Export all cases as structured JSON payload',
           '  clear                      Clear terminal console screen',
@@ -814,6 +852,21 @@ export async function executeDatabaseCliCommand(
         output: result.success
           ? `SUCCESS: Firestore ping responded in ${result.latencyMs}ms. Status: CONNECTED`
           : `WARN: Ping failed (${result.latencyMs}ms). Message: ${result.message}`,
+        data: result,
+      };
+    }
+
+    case 'purge':
+    case 'purge-samples':
+    case 'purge-demo': {
+      const result = await purgeSampleCases();
+      return {
+        command: rawCommand,
+        timestamp,
+        format: 'text',
+        output: result.purgedCount > 0
+          ? `SUCCESS: Purged ${result.purgedCount} fake/sample case(s) from database and cache.\nPurged IDs: ${result.purgedIds.join(', ')}\nReloading case library...`
+          : `NOTICE: No sample/demo cases found matching placeholder patterns (case-cxr-*, case-ct-*, baseline-*, sample-*). Library is clean.`,
         data: result,
       };
     }

@@ -26,6 +26,7 @@ import {
   subscribeToDiagnostics,
   testFirestoreConnection,
   reseedFirestoreWithBaselineCases,
+  purgeSampleCases,
   clearLocalCasesCache,
   inspectLocalCache,
   SyncDiagnosticData,
@@ -171,7 +172,7 @@ export const DiagnosticPanel: React.FC<DiagnosticPanelProps> = ({
   };
 
   const handleClearLocalCache = () => {
-    if (!window.confirm('Clear local browser cases cache? (Static 20 seed cases and Firestore remote cases will remain intact)')) {
+    if (!window.confirm('Clear local browser cases cache? (Static seed cases and Firestore remote cases will remain intact)')) {
       return;
     }
     clearLocalCasesCache();
@@ -181,6 +182,33 @@ export const DiagnosticPanel: React.FC<DiagnosticPanelProps> = ({
       type: 'info' as any,
     });
     setTimeout(() => setActionNotice(null), 4000);
+  };
+
+  const handlePurgeSamples = async () => {
+    if (!window.confirm('Are you sure you want to purge all demo/sample placeholder cases (case-cxr-*, case-ct-*, etc.) from Firestore and local cache? Only your real uploaded cases will remain.')) {
+      return;
+    }
+    setIsResyncing(true);
+    setActionNotice(null);
+    try {
+      const res = await purgeSampleCases();
+      await onRefreshCases();
+      setLocalInspectData(inspectLocalCache());
+      setActionNotice({
+        text: res.purgedCount > 0 
+          ? `Purged ${res.purgedCount} sample case(s) from database and cache!` 
+          : 'No sample/demo cases found in database. Everything is clean!',
+        type: 'success',
+      });
+    } catch (e: any) {
+      setActionNotice({
+        text: `Purge error: ${e?.message || e}`,
+        type: 'error',
+      });
+    } finally {
+      setIsResyncing(false);
+      setTimeout(() => setActionNotice(null), 6000);
+    }
   };
 
   const filteredLogs = (diagData?.logs || []).filter((log) => {
@@ -496,6 +524,16 @@ export const DiagnosticPanel: React.FC<DiagnosticPanelProps> = ({
             >
               <Trash2 className="w-3.5 h-3.5" />
               Flush Local Cache
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePurgeSamples}
+              disabled={isResyncing}
+              className="px-3.5 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 text-xs font-semibold transition-colors flex items-center gap-1.5 border border-rose-200 dark:border-rose-800/60 cursor-pointer disabled:opacity-50"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+              Purge Demo / Fake Cases
             </button>
           </div>
 
