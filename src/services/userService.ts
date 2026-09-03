@@ -13,7 +13,7 @@ import {
 } from 'firebase/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { db } from '../lib/firebase';
+import { db, checkWriteQuotaPersisted, tripWriteQuota } from '../lib/firebase';
 import { UserProfile } from '../types';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -148,6 +148,33 @@ export async function setTesterAccess(
   note?: string,
   adminIdentifier = 'Admin'
 ): Promise<{ success: boolean; message: string; error?: string }> {
+  // 1. Try server API first
+  try {
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(uid)}/tester`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer radmed_admin_secret_key_2026',
+      },
+      body: JSON.stringify({ isTester, note, grantedBy: adminIdentifier }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) return data;
+    }
+  } catch (apiErr) {
+    console.warn('Server toggle tester status failed, falling back to client-side...', apiErr);
+  }
+
+  // 2. Client-side fallback check
+  if (checkWriteQuotaPersisted()) {
+    return {
+      success: false,
+      message: '',
+      error: 'Firestore write quota is exceeded. Operating resiliently (cannot update tester status client-side).',
+    };
+  }
+
   try {
     const userRef = doc(db, 'users', uid);
     const updateData: Partial<UserProfile> = {
@@ -168,22 +195,11 @@ export async function setTesterAccess(
         : 'Testing access revoked. User returned to standard tier.',
     };
   } catch (err: any) {
-    console.error('Error updating tester status in Firestore:', err);
-    // Fallback to server API
-    try {
-      const res = await fetch(`/api/admin/users/${encodeURIComponent(uid)}/tester`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer radmed_admin_secret_key_2026',
-        },
-        body: JSON.stringify({ isTester, note, grantedBy: adminIdentifier }),
-      });
-      const data = await res.json();
-      if (data.success) return data;
-    } catch {
-      // ignore
+    const msg = err?.message || String(err);
+    if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+      tripWriteQuota();
     }
+    console.error('Error updating tester status in Firestore:', err);
     return { success: false, message: '', error: err.message || 'Failed to update testing access status.' };
   }
 }
@@ -193,6 +209,33 @@ export async function toggleUserPremiumStatus(
   uid: string,
   isPremium: boolean
 ): Promise<{ success: boolean; message: string; error?: string }> {
+  // 1. Try server API first
+  try {
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(uid)}/premium`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer radmed_admin_secret_key_2026',
+      },
+      body: JSON.stringify({ isPremium }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) return data;
+    }
+  } catch (apiErr) {
+    console.warn('Server toggle premium failed, falling back to client-side...', apiErr);
+  }
+
+  // 2. Client-side fallback check
+  if (checkWriteQuotaPersisted()) {
+    return {
+      success: false,
+      message: '',
+      error: 'Firestore write quota is exceeded. Operating resiliently.',
+    };
+  }
+
   try {
     const userRef = doc(db, 'users', uid);
     await updateDoc(userRef, {
@@ -204,6 +247,10 @@ export async function toggleUserPremiumStatus(
       message: isPremium ? 'User granted Lifetime Pro status.' : 'User reverted to Free tier.',
     };
   } catch (err: any) {
+    const msg = err?.message || String(err);
+    if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+      tripWriteQuota();
+    }
     return { success: false, message: '', error: err.message || 'Failed to update premium status.' };
   }
 }
@@ -293,6 +340,53 @@ export async function createNewTesterAccount(
     unlockedAt: new Date().toISOString(),
   };
 
+  // 1. Prioritize Server-Side API
+  try {
+    const res = await fetch('/api/admin/users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer radmed_admin_secret_key_2026',
+      },
+      body: JSON.stringify({
+        ...profile,
+        password: finalPassword,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        return {
+          success: true,
+          user: data.user || profile,
+          credentials: {
+            username: cleanUsername,
+            email: finalEmail,
+            password: finalPassword,
+          },
+          message: data.message,
+        };
+      }
+    }
+  } catch (apiErr) {
+    console.warn('Server tester creation failed, falling back to client write...', apiErr);
+  }
+
+  // 2. Client-side fallback checks
+  if (checkWriteQuotaPersisted()) {
+    console.info('[Quota Shield] registerTesterInFirestore direct write skipped due to active circuit breaker.');
+    return {
+      success: true,
+      user: profile,
+      credentials: {
+        username: cleanUsername,
+        email: finalEmail,
+        password: finalPassword,
+      },
+      message: `Testing account registered locally. Access is granted locally (Quota Exceeded).`,
+    };
+  }
+
   try {
     const userRef = doc(db, 'users', safeId);
     await setDoc(userRef, profile, { merge: true });
@@ -308,36 +402,11 @@ export async function createNewTesterAccount(
       message: `Testing account created for "${cleanUsername}" with full access.`,
     };
   } catch (err: any) {
-    console.error('Error creating tester in Firestore:', err);
-    // Server API fallback
-    try {
-      const res = await fetch('/api/admin/users', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer radmed_admin_secret_key_2026',
-        },
-        body: JSON.stringify({
-          ...profile,
-          password: finalPassword,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        return {
-          success: true,
-          user: data.user || profile,
-          credentials: {
-            username: cleanUsername,
-            email: finalEmail,
-            password: finalPassword,
-          },
-          message: data.message,
-        };
-      }
-    } catch {
-      // ignore
+    const msg = err?.message || String(err);
+    if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+      tripWriteQuota();
     }
+    console.error('Error creating tester in Firestore fallback:', err);
     return { success: false, error: err.message || 'Failed to create testing account.' };
   }
 }
@@ -353,6 +422,33 @@ export async function updateTesterCredentials(
     phoneNumber?: string;
   }
 ): Promise<{ success: boolean; message: string; error?: string }> {
+  // 1. Try server API first
+  try {
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(uid)}/credentials`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer radmed_admin_secret_key_2026',
+      },
+      body: JSON.stringify(params),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) return data;
+    }
+  } catch (apiErr) {
+    console.warn('Server update credentials failed, falling back to client-side...', apiErr);
+  }
+
+  // 2. Client-side fallback check
+  if (checkWriteQuotaPersisted()) {
+    return {
+      success: false,
+      message: '',
+      error: 'Firestore write quota is exceeded. Operating resiliently.',
+    };
+  }
+
   try {
     const userRef = doc(db, 'users', uid);
     const updates: Partial<UserProfile> = {};
@@ -365,6 +461,10 @@ export async function updateTesterCredentials(
     await updateDoc(userRef, updates);
     return { success: true, message: 'Tester credentials updated successfully.' };
   } catch (err: any) {
+    const msg = err?.message || String(err);
+    if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+      tripWriteQuota();
+    }
     return { success: false, message: '', error: err.message || 'Failed to update credentials.' };
   }
 }
@@ -373,11 +473,36 @@ export async function updateTesterCredentials(
 export async function deleteUserAccount(
   uid: string
 ): Promise<{ success: boolean; message: string; error?: string }> {
+  // 1. Try server API first
+  try {
+    const res = await fetch(`/api/admin/users/${encodeURIComponent(uid)}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: 'Bearer radmed_admin_secret_key_2026',
+      },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) return data;
+    }
+  } catch (apiErr) {
+    console.warn('Server delete account failed, falling back to client-side...', apiErr);
+  }
+
+  // 2. Client-side fallback check
+  if (checkWriteQuotaPersisted()) {
+    return {
+      success: false,
+      message: '',
+      error: 'Firestore write quota is exceeded. Operating resiliently.',
+    };
+  }
+
   try {
     const userRef = doc(db, 'users', uid);
     await deleteDoc(userRef);
 
-    // Also notify server to clean up any server-side state if needed
+    // Run background server-sync fire-and-forget
     fetch(`/api/admin/users/${encodeURIComponent(uid)}`, {
       method: 'DELETE',
       headers: {
@@ -390,20 +515,11 @@ export async function deleteUserAccount(
       message: 'Account successfully removed from database.',
     };
   } catch (err: any) {
-    console.error('Error deleting user from Firestore:', err);
-    // Try server API
-    try {
-      const res = await fetch(`/api/admin/users/${encodeURIComponent(uid)}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: 'Bearer radmed_admin_secret_key_2026',
-        },
-      });
-      const data = await res.json();
-      if (data.success) return data;
-    } catch {
-      // ignore
+    const msg = err?.message || String(err);
+    if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+      tripWriteQuota();
     }
+    console.error('Error deleting user from Firestore:', err);
     return { success: false, message: '', error: err.message || 'Failed to delete user account.' };
   }
 }
@@ -416,6 +532,35 @@ export async function bulkDeleteTesterAccounts(
     return { success: true, deletedCount: 0 };
   }
 
+  // 1. Try server API first
+  try {
+    const res = await fetch('/api/admin/users/bulk-delete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer radmed_admin_secret_key_2026',
+      },
+      body: JSON.stringify({ uids }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        return { success: true, deletedCount: data.deletedCount };
+      }
+    }
+  } catch (apiErr) {
+    console.warn('Server bulk delete failed, falling back to client-side...', apiErr);
+  }
+
+  // 2. Client-side fallback check
+  if (checkWriteQuotaPersisted()) {
+    return {
+      success: false,
+      deletedCount: 0,
+      error: 'Firestore write quota is exceeded. Operating resiliently.',
+    };
+  }
+
   try {
     const batch = writeBatch(db);
     for (const uid of uids) {
@@ -424,6 +569,10 @@ export async function bulkDeleteTesterAccounts(
     await batch.commit();
     return { success: true, deletedCount: uids.length };
   } catch (err: any) {
+    const msg = err?.message || String(err);
+    if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+      tripWriteQuota();
+    }
     console.error('Error bulk deleting in Firestore:', err);
     // Fallback one-by-one
     let count = 0;
@@ -431,8 +580,12 @@ export async function bulkDeleteTesterAccounts(
       try {
         await deleteDoc(doc(db, 'users', uid));
         count++;
-      } catch {
-        // ignore
+      } catch (singleErr: any) {
+        const sMsg = singleErr?.message || String(singleErr);
+        if (sMsg.toLowerCase().includes('quota') || sMsg.toLowerCase().includes('exceeded') || singleErr?.code === 'resource-exhausted') {
+          tripWriteQuota();
+          break; // Stop loop if quota triggered
+        }
       }
     }
     return { success: count > 0, deletedCount: count };

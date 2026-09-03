@@ -8,7 +8,7 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
-import { auth, db, googleProvider } from '../lib/firebase';
+import { auth, db, googleProvider, checkWriteQuotaPersisted, tripWriteQuota } from '../lib/firebase';
 import { UserProfile } from '../types';
 import { savePremiumStatus, getStoredPremiumStatus, markUserAsPremium, clearPremiumStatus } from './paymentService';
 
@@ -48,6 +48,10 @@ export async function updateUserPremiumStatusInFirestore(
   uid: string,
   data: Partial<UserProfile>
 ): Promise<void> {
+  if (checkWriteQuotaPersisted()) {
+    console.info('[Quota Shield] Short-circuiting updateUserPremiumStatusInFirestore write due to active circuit breaker.');
+    return;
+  }
   try {
     const userRef = doc(db, 'users', uid);
     await updateDoc(userRef, {
@@ -55,15 +59,86 @@ export async function updateUserPremiumStatusInFirestore(
       isPremium: true,
       unlockedAt: data.unlockedAt || new Date().toISOString(),
     });
-  } catch (err) {
+  } catch (err: any) {
+    const msg = err?.message || String(err);
+    if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+      tripWriteQuota();
+    }
     console.warn('Could not update user premium in Firestore:', err);
   }
 }
 
 // Fetch user profile from Firestore or create baseline
 export async function syncUserProfileFromFirestore(user: User): Promise<UserProfile> {
-  const userRef = doc(db, 'users', user.uid);
   const localPrem = getStoredPremiumStatus();
+
+  // 1. Try server-side synchronization API first
+  try {
+    const res = await fetch('/api/auth/sync', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        provider: user.providerData?.[0]?.providerId || 'password',
+        localPrem,
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.profile) {
+        const profile = data.profile as UserProfile;
+        if (profile.isPremium || profile.isTester) {
+          markUserAsPremium(profile.mpesaReceiptNumber || (profile.isTester ? 'TESTER_FREE_ACCESS' : undefined), profile.phoneNumber || undefined);
+        } else {
+          clearPremiumStatus();
+        }
+        cacheUserProfile(profile);
+        return profile;
+      }
+    } else {
+      // Server returned non-200, check if quota limits are exceeded on backend
+      const text = await res.text().catch(() => '');
+      if (text.toLowerCase().includes('quota') || text.toLowerCase().includes('exceeded') || text.toLowerCase().includes('resource-exhausted')) {
+        tripWriteQuota();
+      }
+    }
+  } catch (apiErr) {
+    console.warn('[Profile Sync] Server sync API unavailable, reverting to client fallback:', apiErr);
+  }
+
+  // 2. Client-side fallback check (only run if server API was unreachable and quota is not exceeded)
+  if (checkWriteQuotaPersisted()) {
+    console.info('[Profile Sync] Client-side fallback skipped: write quota is currently marked as exceeded.');
+    const cached = getCachedUserProfile();
+    if (cached && cached.uid === user.uid) {
+      return cached;
+    }
+    const hasPaid = Boolean(localPrem.isPremium && localPrem.receiptNumber);
+    const fallbackProfile: UserProfile = {
+      uid: user.uid,
+      email: user.email,
+      username: user.email ? user.email.split('@')[0] : undefined,
+      displayName: user.displayName || user.email?.split('@')[0] || 'Clinician',
+      isPremium: hasPaid,
+      mpesaReceiptNumber: hasPaid ? localPrem.receiptNumber : undefined,
+      phoneNumber: hasPaid ? localPrem.phoneNumber : undefined,
+      createdAt: new Date().toISOString(),
+    };
+    if (hasPaid) {
+      markUserAsPremium(fallbackProfile.mpesaReceiptNumber, fallbackProfile.phoneNumber);
+    } else {
+      clearPremiumStatus();
+    }
+    cacheUserProfile(fallbackProfile);
+    return fallbackProfile;
+  }
+
+  const userRef = doc(db, 'users', user.uid);
 
   try {
     const snap = await getDoc(userRef);
@@ -78,11 +153,18 @@ export async function syncUserProfileFromFirestore(user: User): Promise<UserProf
         data.isPremium = true;
         data.mpesaReceiptNumber = localPrem.receiptNumber;
         data.unlockedAt = localPrem.unlockedAt || new Date().toISOString();
-        await updateDoc(userRef, {
-          isPremium: true,
-          mpesaReceiptNumber: data.mpesaReceiptNumber,
-          unlockedAt: data.unlockedAt,
-        }).catch(() => null);
+        if (!checkWriteQuotaPersisted()) {
+          await updateDoc(userRef, {
+            isPremium: true,
+            mpesaReceiptNumber: data.mpesaReceiptNumber,
+            unlockedAt: data.unlockedAt,
+          }).catch((err: any) => {
+            const msg = err?.message || String(err);
+            if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+              tripWriteQuota();
+            }
+          });
+        }
       }
 
       if (data.isPremium || data.isTester) {
@@ -115,9 +197,16 @@ export async function syncUserProfileFromFirestore(user: User): Promise<UserProf
               username: existingData.username,
               unlockedAt: existingData.unlockedAt || new Date().toISOString(),
             };
-            await setDoc(userRef, mergedProfile);
-            if (foundDoc.id !== user.uid && foundDoc.id.startsWith('test_')) {
-              deleteDoc(foundDoc.ref).catch(() => null);
+            if (!checkWriteQuotaPersisted()) {
+              await setDoc(userRef, mergedProfile).catch((err: any) => {
+                const msg = err?.message || String(err);
+                if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+                  tripWriteQuota();
+                }
+              });
+              if (foundDoc.id !== user.uid && foundDoc.id.startsWith('test_')) {
+                deleteDoc(foundDoc.ref).catch(() => null);
+              }
             }
             if (mergedProfile.isPremium || mergedProfile.isTester) {
               markUserAsPremium(mergedProfile.mpesaReceiptNumber || 'TESTER_FREE_ACCESS', mergedProfile.phoneNumber || undefined);
@@ -145,9 +234,15 @@ export async function syncUserProfileFromFirestore(user: User): Promise<UserProf
         createdAt: new Date().toISOString(),
       };
 
-      await setDoc(userRef, newProfile).catch((err) => {
-        console.warn('Could not write user profile to Firestore (operating locally):', err);
-      });
+      if (!checkWriteQuotaPersisted()) {
+        await setDoc(userRef, newProfile).catch((err: any) => {
+          const msg = err?.message || String(err);
+          if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+            tripWriteQuota();
+          }
+          console.warn('Could not write user profile to Firestore (operating locally):', err);
+        });
+      }
 
       if (hasPaid) {
         markUserAsPremium(newProfile.mpesaReceiptNumber, newProfile.phoneNumber);
@@ -158,7 +253,11 @@ export async function syncUserProfileFromFirestore(user: User): Promise<UserProf
       cacheUserProfile(newProfile);
       return newProfile;
     }
-  } catch (err) {
+  } catch (err: any) {
+    const msg = err?.message || String(err);
+    if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+      tripWriteQuota();
+    }
     console.warn('Firestore user fetch failed, using fallback profile:', err);
     const hasPaid = Boolean(localPrem.isPremium && localPrem.receiptNumber);
     const fallbackProfile: UserProfile = {
@@ -219,21 +318,63 @@ export async function registerWithEmail(
       createdAt: new Date().toISOString(),
     };
 
-    // Save to Firestore
+    // Try server sync first
+    let syncedProfile = profile;
     try {
-      await setDoc(doc(db, 'users', cred.user.uid), profile);
-    } catch (e) {
-      console.warn('Failed saving user document to Firestore:', e);
+      const res = await fetch('/api/auth/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          uid: cred.user.uid,
+          email: cred.user.email,
+          displayName: profile.displayName,
+          provider: 'email_password',
+          localPrem: {
+            isPremium: hasPaid,
+            receiptNumber: mpesaReceipt,
+            phoneNumber: phone,
+            unlockedAt: profile.unlockedAt,
+          },
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.profile) {
+          syncedProfile = data.profile;
+        }
+      } else {
+        const text = await res.text().catch(() => '');
+        if (text.toLowerCase().includes('quota') || text.toLowerCase().includes('exceeded') || text.toLowerCase().includes('resource-exhausted')) {
+          tripWriteQuota();
+        }
+      }
+    } catch (apiErr) {
+      console.warn('Server registration profile sync failed, falling back to client write...', apiErr);
+      // Fallback save to Firestore directly
+      if (!checkWriteQuotaPersisted()) {
+        try {
+          await setDoc(doc(db, 'users', cred.user.uid), profile).catch((err: any) => {
+            const msg = err?.message || String(err);
+            if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+              tripWriteQuota();
+            }
+          });
+        } catch (e) {
+          console.warn('Failed saving user document to Firestore:', e);
+        }
+      }
     }
 
-    if (hasPaid) {
-      markUserAsPremium(mpesaReceipt, phone);
+    if (syncedProfile.isPremium || syncedProfile.isTester) {
+      markUserAsPremium(syncedProfile.mpesaReceiptNumber || (syncedProfile.isTester ? 'TESTER_FREE_ACCESS' : undefined), syncedProfile.phoneNumber || undefined);
     } else {
       clearPremiumStatus();
     }
-    cacheUserProfile(profile);
+    cacheUserProfile(syncedProfile);
 
-    return { success: true, user: profile };
+    return { success: true, user: syncedProfile };
   } catch (err: any) {
     let msg = err.message || 'Account registration failed.';
     if (err.code === 'auth/email-already-in-use') {
@@ -382,50 +523,125 @@ export async function signInWithGoogleAccount(
 ): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
   try {
     const cred = await signInWithPopup(auth, googleProvider);
-    const userRef = doc(db, 'users', cred.user.uid);
     const localPrem = getStoredPremiumStatus();
+    const hasPaid = Boolean(paymentDetails?.mpesaReceiptNumber || (localPrem.isPremium && localPrem.receiptNumber));
+    const mpesaReceipt = paymentDetails?.mpesaReceiptNumber || (hasPaid ? localPrem.receiptNumber : undefined);
+    const phone = paymentDetails?.phoneNumber || (hasPaid ? localPrem.phoneNumber : undefined);
 
     let profile: UserProfile;
+
+    // 1. Prioritize Server-Side Synchronization API
+    try {
+      const res = await fetch('/api/auth/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          uid: cred.user.uid,
+          email: cred.user.email,
+          displayName: cred.user.displayName,
+          provider: 'google',
+          localPrem: {
+            isPremium: hasPaid,
+            receiptNumber: mpesaReceipt,
+            phoneNumber: phone,
+            unlockedAt: localPrem.unlockedAt,
+          },
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.profile) {
+          profile = data.profile;
+          if (profile.isPremium || profile.isTester) {
+            markUserAsPremium(profile.mpesaReceiptNumber || (profile.isTester ? 'TESTER_FREE_ACCESS' : undefined), profile.phoneNumber || undefined);
+          } else {
+            clearPremiumStatus();
+          }
+          cacheUserProfile(profile);
+          return { success: true, user: profile };
+        }
+      }
+    } catch (apiErr) {
+      console.warn('Server Google sign-in sync failed, falling back to client read/write...', apiErr);
+    }
+
+    // 2. Client-Side fallback only if server sync is offline
+    if (checkWriteQuotaPersisted()) {
+      profile = {
+        uid: cred.user.uid,
+        email: cred.user.email,
+        displayName: cred.user.displayName || cred.user.email?.split('@')[0] || 'Clinician',
+        isPremium: hasPaid,
+        mpesaReceiptNumber: mpesaReceipt,
+        phoneNumber: phone,
+        unlockedAt: hasPaid ? (localPrem.unlockedAt || new Date().toISOString()) : undefined,
+        provider: 'google',
+        createdAt: new Date().toISOString(),
+      };
+      if (profile.isPremium) {
+        markUserAsPremium(profile.mpesaReceiptNumber, profile.phoneNumber || undefined);
+      } else {
+        clearPremiumStatus();
+      }
+      cacheUserProfile(profile);
+      return { success: true, user: profile };
+    }
+
+    const userRef = doc(db, 'users', cred.user.uid);
     try {
       const snap = await getDoc(userRef);
       if (snap.exists()) {
         profile = snap.data() as UserProfile;
-        const hasPaid = Boolean(paymentDetails?.mpesaReceiptNumber || (localPrem.isPremium && localPrem.receiptNumber));
         if (hasPaid && !profile.isPremium) {
           profile.isPremium = true;
-          profile.mpesaReceiptNumber = paymentDetails?.mpesaReceiptNumber || profile.mpesaReceiptNumber || localPrem.receiptNumber;
-          profile.phoneNumber = paymentDetails?.phoneNumber || profile.phoneNumber || localPrem.phoneNumber;
+          profile.mpesaReceiptNumber = mpesaReceipt;
+          profile.phoneNumber = phone;
           profile.unlockedAt = profile.unlockedAt || new Date().toISOString();
-          await updateDoc(userRef, {
-            isPremium: true,
-            mpesaReceiptNumber: profile.mpesaReceiptNumber,
-            phoneNumber: profile.phoneNumber,
-            unlockedAt: profile.unlockedAt,
-          }).catch(() => null);
+          if (!checkWriteQuotaPersisted()) {
+            await updateDoc(userRef, {
+              isPremium: true,
+              mpesaReceiptNumber: profile.mpesaReceiptNumber,
+              phoneNumber: profile.phoneNumber,
+              unlockedAt: profile.unlockedAt,
+            }).catch((err: any) => {
+              const msg = err?.message || String(err);
+              if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+                tripWriteQuota();
+              }
+            });
+          }
         }
       } else {
-        const hasPaid = Boolean(paymentDetails?.mpesaReceiptNumber || (localPrem.isPremium && localPrem.receiptNumber));
         profile = {
           uid: cred.user.uid,
           email: cred.user.email,
           displayName: cred.user.displayName || cred.user.email?.split('@')[0] || 'Clinician',
           isPremium: hasPaid,
-          mpesaReceiptNumber: paymentDetails?.mpesaReceiptNumber || (hasPaid ? localPrem.receiptNumber : undefined),
-          phoneNumber: paymentDetails?.phoneNumber || (hasPaid ? localPrem.phoneNumber : undefined),
+          mpesaReceiptNumber: mpesaReceipt,
+          phoneNumber: phone,
           unlockedAt: hasPaid ? (localPrem.unlockedAt || new Date().toISOString()) : undefined,
           provider: 'google',
           createdAt: new Date().toISOString(),
         };
-        await setDoc(userRef, profile).catch(() => null);
+        if (!checkWriteQuotaPersisted()) {
+          await setDoc(userRef, profile).catch((err: any) => {
+            const msg = err?.message || String(err);
+            if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+              tripWriteQuota();
+            }
+          });
+        }
       }
     } catch {
-      const hasPaid = Boolean(paymentDetails?.mpesaReceiptNumber || (localPrem.isPremium && localPrem.receiptNumber));
       profile = {
         uid: cred.user.uid,
         email: cred.user.email,
-        displayName: cred.user.displayName,
+        displayName: cred.user.displayName || cred.user.email?.split('@')[0] || 'Clinician',
         isPremium: hasPaid,
-        mpesaReceiptNumber: paymentDetails?.mpesaReceiptNumber || (hasPaid ? localPrem.receiptNumber : undefined),
+        mpesaReceiptNumber: mpesaReceipt,
+        phoneNumber: phone,
       };
     }
 

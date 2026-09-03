@@ -1,5 +1,5 @@
 import { collection, getDocs, doc, setDoc, deleteDoc, getDocFromServer, getDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, checkWriteQuotaPersisted, tripWriteQuota } from '../lib/firebase';
 import { MedicalCase } from '../types';
 import { DEFAULT_BASELINE_CASES } from './baselineCases';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -7,6 +7,10 @@ import { isDataOrBlobUrl } from '../lib/imageUtils';
 
 const COLLECTION_NAME = 'cases';
 const LOCAL_STORAGE_KEY = 'radmed_custom_cases_cache';
+
+// Transient cache to track custom cases that we have already attempted to sync in this browser session.
+// This prevents infinite write retry loops if Firestore write quota is exhausted.
+const syncAttemptedIds = new Set<string>();
 
 /**
  * Shows an elegant temporary toast notification when Firestore is offline or in quota-blocked mode.
@@ -335,8 +339,8 @@ export async function fetchCases(): Promise<MedicalCase[]> {
     }
   }
 
-  // 2. Secondary Fallback: Direct Client Firestore Fetch (Only if backend API failed or returned 0 cases, and we have not already verified quota is exceeded)
-  if (!isQuotaExceeded && (!remoteFetchSuccess || remoteCases.length === 0)) {
+  // 2. Secondary Fallback: Direct Client Firestore Fetch (Only if backend API failed and we have not already verified quota is exceeded)
+  if (!isQuotaExceeded && !remoteFetchSuccess) {
     addDiagnosticLog('info', 'sync', 'Reverting to direct Firestore client-side fetch...');
     try {
       const querySnapshot = await getDocs(collection(db, COLLECTION_NAME));
@@ -428,21 +432,27 @@ export async function fetchCases(): Promise<MedicalCase[]> {
 
     // Automatically sync these back up to Firestore/Backend in the background now that connection is active!
     if (unsyncedCases.length > 0) {
-      const actualUnsynced = unsyncedCases.filter(uc => uc && uc.id && !uc.id.startsWith('baseline-'));
+      const actualUnsynced = unsyncedCases.filter(
+        uc => uc && uc.id && !uc.id.startsWith('baseline-') && !syncAttemptedIds.has(uc.id)
+      );
       if (actualUnsynced.length > 0) {
+        actualUnsynced.forEach(uc => syncAttemptedIds.add(uc.id));
         addDiagnosticLog('info', 'sync', `Detected ${actualUnsynced.length} unsynced local custom cases. Syncing to remote database in background...`);
         Promise.all(
           actualUnsynced.map(async (uc) => {
             try {
-              await setDoc(doc(db, COLLECTION_NAME, uc.id), uc);
-              await fetch('/api/cases', {
+              const resp = await fetch('/api/cases', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(uc),
               });
+              if (!resp.ok) {
+                throw new Error(`Server returned status ${resp.status}`);
+              }
               addDiagnosticLog('success', 'sync', `Background sync: Successfully uploaded case "${uc.title}" to shared database.`);
             } catch (syncErr: any) {
               console.warn(`Background sync failed for case "${uc.title}":`, syncErr);
+              addDiagnosticLog('warn', 'sync', `Postponed background sync retry for "${uc.title}" to avoid quota spam.`);
             }
           })
         ).catch((e) => {
@@ -516,25 +526,34 @@ export async function addCaseToFirestore(newCase: MedicalCase): Promise<void> {
     addDiagnosticLog('warn', 'storage', 'Failed to write case to localStorage.');
   }
 
-  // 2. Persist directly to Firestore
-  let firestoreSuccess = false;
+  // 2. Persist with server-side pipeline as the primary source of truth (highly cached and safe)
   try {
-    await setDoc(doc(db, COLLECTION_NAME, caseToSave.id), caseToSave);
-    firestoreSuccess = true;
-    addDiagnosticLog('success', 'sync', `Case "${caseToSave.title}" persisted directly to Firestore collection "${COLLECTION_NAME}".`);
-  } catch (error: any) {
-    addDiagnosticLog('warn', 'sync', `Firestore direct write notice: ${error?.message || error}. Attempting backend API pipeline...`);
-  }
-
-  // 3. Dual-persistence fallback to backend API if Firestore client write failed or to ensure server consistency
-  try {
-    await fetch('/api/cases', {
+    const resp = await fetch('/api/cases', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(caseToSave),
     });
-  } catch (backendErr) {
-    // ignore
+    if (!resp.ok) {
+      throw new Error(`Server returned status ${resp.status}`);
+    }
+    addDiagnosticLog('success', 'sync', `Case "${caseToSave.title}" saved successfully through server pipeline.`);
+  } catch (backendErr: any) {
+    addDiagnosticLog('warn', 'sync', `Backend API save notice: ${backendErr?.message || backendErr}. Attempting direct client-side fallback...`);
+    // 3. Fall back to client-side direct Firestore setDoc ONLY if server pipeline is offline/unreachable
+    if (checkWriteQuotaPersisted()) {
+      addDiagnosticLog('warn', 'sync', 'Firestore write quota exceeded. Direct fallback save skipped to prevent console error.');
+    } else {
+      try {
+        await setDoc(doc(db, COLLECTION_NAME, caseToSave.id), caseToSave);
+        addDiagnosticLog('success', 'sync', `Case "${caseToSave.title}" saved successfully through client-side fallback.`);
+      } catch (fsErr: any) {
+        const msg = fsErr?.message || String(fsErr);
+        if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || fsErr?.code === 'resource-exhausted') {
+          tripWriteQuota();
+        }
+        addDiagnosticLog('error', 'sync', `Client-side fallback also failed: ${fsErr?.message || fsErr}`);
+      }
+    }
   }
 
   notifySubscribers();
@@ -556,22 +575,33 @@ export async function deleteCaseFromFirestore(caseId: string): Promise<void> {
     // ignore
   }
 
-  // Delete from Firestore
+  // 2. Perform backend API delete as the primary source of truth (highly cached and safe)
   try {
-    await deleteDoc(doc(db, COLLECTION_NAME, caseId));
-    addDiagnosticLog('success', 'sync', `Deleted case ID ${caseId} from Firestore.`);
-  } catch (error: any) {
-    addDiagnosticLog('warn', 'sync', `Firestore delete note: ${error?.message || error}. Case removed locally.`);
-  }
-
-  // Dual-delete via server API
-  try {
-    await fetch(`/api/admin/cases/${caseId}`, {
+    const resp = await fetch(`/api/admin/cases/${caseId}`, {
       method: 'DELETE',
       headers: { Authorization: 'Bearer radmed_admin_secret_key_2026' },
     });
-  } catch {
-    // ignore
+    if (!resp.ok) {
+      throw new Error(`Server returned status ${resp.status}`);
+    }
+    addDiagnosticLog('success', 'sync', `Deleted case ID ${caseId} from Firestore through server pipeline.`);
+  } catch (backendErr: any) {
+    addDiagnosticLog('warn', 'sync', `Backend API delete notice: ${backendErr?.message || backendErr}. Attempting direct client-side fallback...`);
+    // 3. Fall back to client-side direct Firestore deleteDoc ONLY if server pipeline is offline/unreachable
+    if (checkWriteQuotaPersisted()) {
+      addDiagnosticLog('warn', 'sync', 'Firestore write quota exceeded. Direct fallback delete skipped.');
+    } else {
+      try {
+        await deleteDoc(doc(db, COLLECTION_NAME, caseId));
+        addDiagnosticLog('success', 'sync', `Deleted case ID ${caseId} from Firestore through client-side fallback.`);
+      } catch (fsErr: any) {
+        const msg = fsErr?.message || String(fsErr);
+        if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || fsErr?.code === 'resource-exhausted') {
+          tripWriteQuota();
+        }
+        addDiagnosticLog('error', 'sync', `Client-side fallback delete failed: ${fsErr?.message || fsErr}`);
+      }
+    }
   }
 
   notifySubscribers();
@@ -615,12 +645,21 @@ export async function purgeSampleCases(): Promise<{
   );
 
   const purgedIds: string[] = [];
-  for (const c of casesToPurge) {
-    try {
-      await deleteDoc(doc(db, COLLECTION_NAME, c.id));
-      purgedIds.push(c.id);
-    } catch (err) {
-      console.warn(`Could not delete sample case ${c.id}:`, err);
+  if (checkWriteQuotaPersisted()) {
+    addDiagnosticLog('warn', 'sync', 'Firestore write quota exceeded. Direct sample case delete skipped.');
+  } else {
+    for (const c of casesToPurge) {
+      try {
+        await deleteDoc(doc(db, COLLECTION_NAME, c.id));
+        purgedIds.push(c.id);
+      } catch (err: any) {
+        const msg = err?.message || String(err);
+        if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+          tripWriteQuota();
+          break; // Stop loop if quota triggered
+        }
+        console.warn(`Could not delete sample case ${c.id}:`, err);
+      }
     }
   }
 

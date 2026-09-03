@@ -1,5 +1,5 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, checkWriteQuotaPersisted, tripWriteQuota } from '../lib/firebase';
 
 const LOCAL_ADMIN_PASSWORD_KEY = 'rad_admin_custom_password';
 const DEFAULT_INITIAL_PASSWORD = 'admin123';
@@ -80,19 +80,25 @@ export async function updateAdminPassword(
   }
 
   // Save to Firestore
-  try {
-    const docRef = doc(db, 'settings', 'admin');
-    await setDoc(
-      docRef,
-      {
-        id: 'admin',
-        adminPassword: next,
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true }
-    );
-  } catch (err: any) {
-    console.warn('Could not save admin password to Firestore, saving locally:', err);
+  if (!checkWriteQuotaPersisted()) {
+    try {
+      const docRef = doc(db, 'settings', 'admin');
+      await setDoc(
+        docRef,
+        {
+          id: 'admin',
+          adminPassword: next,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+        tripWriteQuota();
+      }
+      console.warn('Could not save admin password to Firestore, saving locally:', err);
+    }
   }
 
   // Save to LocalStorage

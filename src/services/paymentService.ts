@@ -1,6 +1,6 @@
 import { MedicalCase, PaymentConfig, PaymentTransaction } from '../types';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, checkWriteQuotaPersisted, tripWriteQuota } from '../lib/firebase';
 import { sortCasesDeterministically } from './casesService';
 
 const STORAGE_KEY = 'radmed_premium_access_token';
@@ -138,23 +138,8 @@ export async function fetchPaymentConfig(): Promise<PaymentConfig> {
     // ignore
   }
 
-  // 2. Fetch cloud-persisted payment config from Firestore if available
-  try {
-    const docRef = doc(db, 'settings', 'payment');
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const cloudData = snap.data() as Partial<PaymentConfig>;
-      if (cloudData) {
-        if (cloudData.paybillOrTillNumber === '174379') cloudData.paybillOrTillNumber = '1661655';
-        if (cloudData.darajaBusinessShortcode === '174379') cloudData.darajaBusinessShortcode = '1661655';
-        Object.assign(defaults, cloudData);
-      }
-    }
-  } catch (err) {
-    // ignore firestore offline
-  }
-
-  // 3. Fetch from API endpoint if custom Node server is running
+  // 2. Fetch from API endpoint if custom Node server is running (highly cached and safe)
+  let serverFetchSuccess = false;
   try {
     const res = await fetch('/api/payment/config');
     const parsed = await safeJsonParse(res);
@@ -163,9 +148,28 @@ export async function fetchPaymentConfig(): Promise<PaymentConfig> {
       if (serverCfg.paybillOrTillNumber === '174379') serverCfg.paybillOrTillNumber = '1661655';
       if (serverCfg.darajaBusinessShortcode === '174379') serverCfg.darajaBusinessShortcode = '1661655';
       Object.assign(defaults, serverCfg);
+      serverFetchSuccess = true;
     }
   } catch (err) {
     // ignore network errors
+  }
+
+  // 3. Fallback: Fetch cloud-persisted payment config from Firestore directly if server API was unreachable
+  if (!serverFetchSuccess) {
+    try {
+      const docRef = doc(db, 'settings', 'payment');
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const cloudData = snap.data() as Partial<PaymentConfig>;
+        if (cloudData) {
+          if (cloudData.paybillOrTillNumber === '174379') cloudData.paybillOrTillNumber = '1661655';
+          if (cloudData.darajaBusinessShortcode === '174379') cloudData.darajaBusinessShortcode = '1661655';
+          Object.assign(defaults, cloudData);
+        }
+      }
+    } catch (err) {
+      // ignore firestore offline
+    }
   }
 
   // Guard against any leftover legacy shortcode
@@ -424,11 +428,17 @@ export async function updatePaymentConfig(
   }
 
   // 2. Persist directly to Firestore settings collection
-  try {
-    const docRef = doc(db, 'settings', 'payment');
-    await setDoc(docRef, config, { merge: true });
-  } catch (err) {
-    console.warn('Could not save payment config to Firestore:', err);
+  if (!checkWriteQuotaPersisted()) {
+    try {
+      const docRef = doc(db, 'settings', 'payment');
+      await setDoc(docRef, config, { merge: true });
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+        tripWriteQuota();
+      }
+      console.warn('Could not save payment config to Firestore:', err);
+    }
   }
 
   // 3. Update server if API available

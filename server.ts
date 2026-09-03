@@ -4,7 +4,7 @@ import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, doc, getDocs, setDoc, updateDoc, deleteDoc, Firestore, setLogLevel } from 'firebase/firestore';
+import { getFirestore, collection, doc, getDocs, getDoc, query, where, setDoc as rawSetDoc, updateDoc as rawUpdateDoc, deleteDoc as rawDeleteDoc, Firestore, setLogLevel } from 'firebase/firestore';
 import dotenv from 'dotenv';
 import { DEFAULT_BASELINE_CASES } from './src/services/baselineCases.js';
 
@@ -42,6 +42,67 @@ const PORT = 3000;
 // Body parser middleware with generous limits for medical imaging base64
 app.use(express.json({ limit: '30mb' }));
 app.use(express.urlencoded({ extended: true, limit: '30mb' }));
+
+// Global server-side Firestore write circuit breaker to survive write quota limits safely
+let serverWriteQuotaExceeded = false;
+
+async function setDoc(docRef: any, data: any, options?: any) {
+  if (serverWriteQuotaExceeded) {
+    console.info('[Server Quota Shield] Skipping setDoc write due to active write quota circuit breaker.');
+    return;
+  }
+  try {
+    if (options) {
+      await rawSetDoc(docRef, data, options);
+    } else {
+      await rawSetDoc(docRef, data);
+    }
+  } catch (err: any) {
+    const msg = err?.message || String(err);
+    if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+      serverWriteQuotaExceeded = true;
+      console.warn('[Server Quota Shield] Engaging server write circuit breaker due to exceeded quota. Aborting write gracefully.');
+      return;
+    }
+    throw err;
+  }
+}
+
+async function updateDoc(docRef: any, data: any) {
+  if (serverWriteQuotaExceeded) {
+    console.info('[Server Quota Shield] Skipping updateDoc write due to active write quota circuit breaker.');
+    return;
+  }
+  try {
+    await rawUpdateDoc(docRef, data);
+  } catch (err: any) {
+    const msg = err?.message || String(err);
+    if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+      serverWriteQuotaExceeded = true;
+      console.warn('[Server Quota Shield] Engaging server write circuit breaker due to exceeded quota. Aborting update gracefully.');
+      return;
+    }
+    throw err;
+  }
+}
+
+async function deleteDoc(docRef: any) {
+  if (serverWriteQuotaExceeded) {
+    console.info('[Server Quota Shield] Skipping deleteDoc write due to active write quota circuit breaker.');
+    return;
+  }
+  try {
+    await rawDeleteDoc(docRef);
+  } catch (err: any) {
+    const msg = err?.message || String(err);
+    if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
+      serverWriteQuotaExceeded = true;
+      console.warn('[Server Quota Shield] Engaging server write circuit breaker due to exceeded quota. Aborting delete gracefully.');
+      return;
+    }
+    throw err;
+  }
+}
 
 // Lazy initialization for Server-Side Firestore database
 let firestoreDb: Firestore | null = null;
@@ -597,6 +658,11 @@ function normalizeMedicalCase(raw: any) {
   if (caseScenarioImageCaption) result.caseScenarioImageCaption = caseScenarioImageCaption;
   if (caseExample) result.caseExample = caseExample;
 
+  // Preserve core synchronization fields
+  if (raw.createdAt) result.createdAt = raw.createdAt;
+  if (raw.updatedAt) result.updatedAt = raw.updatedAt;
+  if (raw.orderIndex !== undefined) result.orderIndex = raw.orderIndex;
+
   if (Array.isArray(raw.galleryImages) && raw.galleryImages.length > 0) {
     result.galleryImages = raw.galleryImages;
   }
@@ -723,31 +789,15 @@ async function getResilientCases(): Promise<any[]> {
     if (db) {
       const snap = await getDocs(collection(db, 'cases'));
       const cases: any[] = [];
-      const baselineDocsToDelete: string[] = [];
       
       snap.forEach((docSnap) => {
         const data = docSnap.data();
         if (data && data.id) {
-          if (data.id.startsWith('baseline-')) {
-            baselineDocsToDelete.push(docSnap.id);
-          } else {
+          if (!data.id.startsWith('baseline-')) {
             cases.push(data);
           }
         }
       });
-      
-      // Proactive background deletion to purge the mistakenly uploaded baseline cases
-      if (baselineDocsToDelete.length > 0) {
-        console.log(`[Database Cleanup] Purging ${baselineDocsToDelete.length} leaked baseline cases from Firestore...`);
-        baselineDocsToDelete.forEach(async (docId) => {
-          try {
-            await deleteDoc(doc(db, 'cases', docId));
-            console.log(`[Database Cleanup] Successfully deleted leaked baseline case: ${docId}`);
-          } catch (delErr) {
-            console.warn(`[Database Cleanup] Failed to delete leaked doc ${docId}:`, delErr);
-          }
-        });
-      }
       
       // Successfully queried database. Cache the unified baseline + custom cases, and update the fetch time
       serverCasesCache = [...DEFAULT_BASELINE_CASES, ...cases];
@@ -1146,6 +1196,111 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// POST /api/auth/sync: Public endpoint to sync a client-authenticated user profile resiliently with the server-side database
+app.post('/api/auth/sync', async (req, res) => {
+  try {
+    const { uid, email, displayName, provider, localPrem } = req.body;
+    if (!uid) {
+      return res.status(400).json({ success: false, error: 'UID is required for synchronization.' });
+    }
+
+    const db = getFirestoreDatabase();
+    if (!db) {
+      return res.status(500).json({ success: false, error: 'Database service is offline.' });
+    }
+
+    const userRef = doc(db, 'users', uid);
+    const snap = await getDoc(userRef);
+
+    let profile: any = null;
+
+    if (snap.exists()) {
+      profile = snap.data();
+      if (profile.isTester) {
+        profile.isPremium = true;
+      }
+      
+      // If client has local premium but cloud doesn't, update cloud
+      if (localPrem && localPrem.isPremium && localPrem.receiptNumber && !profile.isPremium) {
+        profile.isPremium = true;
+        profile.mpesaReceiptNumber = localPrem.receiptNumber;
+        profile.unlockedAt = localPrem.unlockedAt || new Date().toISOString();
+        
+        await updateDoc(userRef, {
+          isPremium: true,
+          mpesaReceiptNumber: profile.mpesaReceiptNumber,
+          unlockedAt: profile.unlockedAt,
+        }).catch((e) => console.warn('[Server Profile Sync] Failed to update premium document: ', e));
+      }
+    } else {
+      // User document does not exist, check pre-registration
+      let foundDoc: any = null;
+      let existingData: any = null;
+
+      if (email) {
+        try {
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, where('email', '==', String(email).toLowerCase().trim()));
+          const emailSnap = await getDocs(q);
+          if (!emailSnap.empty) {
+            foundDoc = emailSnap.docs[0];
+            existingData = foundDoc.data();
+          }
+        } catch (queryErr) {
+          console.warn('[Server Profile Sync] Pre-registration check failed: ', queryErr);
+        }
+      }
+
+      if (foundDoc && existingData) {
+        // Pre-registered tester/user exists, migrate to real UID
+        profile = {
+          ...existingData,
+          uid,
+          email: email || existingData.email,
+          displayName: displayName || existingData.displayName || (email ? email.split('@')[0] : 'Clinician'),
+          isPremium: existingData.isTester ? true : existingData.isPremium,
+          isTester: existingData.isTester,
+          role: existingData.role || (existingData.isTester ? 'tester' : 'user'),
+          testAccountNote: existingData.testAccountNote,
+          username: existingData.username,
+          unlockedAt: existingData.unlockedAt || new Date().toISOString(),
+        };
+
+        await setDoc(userRef, profile).catch((e) => console.warn('[Server Profile Sync] Migrated setDoc warning: ', e));
+
+        if (foundDoc.id !== uid && foundDoc.id.startsWith('test_')) {
+          await deleteDoc(foundDoc.ref).catch(() => null);
+        }
+      } else {
+        // Brand new profile
+        const hasPaid = Boolean(localPrem && localPrem.isPremium && localPrem.receiptNumber);
+        profile = {
+          uid,
+          email: email || null,
+          username: email ? email.split('@')[0] : undefined,
+          displayName: displayName || (email ? email.split('@')[0] : 'Clinician'),
+          isPremium: hasPaid,
+          mpesaReceiptNumber: hasPaid ? localPrem.receiptNumber : undefined,
+          phoneNumber: hasPaid ? localPrem.phoneNumber : undefined,
+          unlockedAt: hasPaid ? (localPrem.unlockedAt || new Date().toISOString()) : undefined,
+          provider: provider || 'google',
+          createdAt: new Date().toISOString(),
+        };
+
+        await setDoc(userRef, profile).catch((e) => console.warn('[Server Profile Sync] New profile setDoc warning: ', e));
+      }
+    }
+
+    return res.json({
+      success: true,
+      profile,
+    });
+  } catch (err: any) {
+    console.error('Server profile synchronization error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ==========================================
 // ADMIN USER & TESTER MANAGEMENT SERVICES
 // ==========================================
@@ -1267,6 +1422,56 @@ app.delete('/api/admin/users/:id', checkAdminAuth, async (req, res) => {
     });
   } catch (err: any) {
     console.error('Error deleting user in server:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/admin/users/:id/premium: Toggle premium status of a user
+app.post('/api/admin/users/:id/premium', checkAdminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isPremium } = req.body;
+    const db = getFirestoreDatabase();
+    if (db) {
+      const userRef = doc(db, 'users', id);
+      await updateDoc(userRef, {
+        isPremium: Boolean(isPremium),
+        unlockedAt: isPremium ? new Date().toISOString() : null,
+      });
+    }
+    return res.json({
+      success: true,
+      message: isPremium ? 'User granted Lifetime Pro status.' : 'User reverted to Free tier.',
+    });
+  } catch (err: any) {
+    console.error('Error toggling user premium in server:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/admin/users/:id/credentials: Update tester credentials or details
+app.post('/api/admin/users/:id/credentials', checkAdminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { username, displayName, password, note, phoneNumber } = req.body;
+    const db = getFirestoreDatabase();
+    if (db) {
+      const userRef = doc(db, 'users', id);
+      const updates: any = {};
+      if (username) updates.username = username.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, '');
+      if (displayName) updates.displayName = displayName.trim();
+      if (password) updates.temporaryPassword = password.trim();
+      if (note !== undefined) updates.testAccountNote = note.trim();
+      if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber.trim() || null;
+
+      await updateDoc(userRef, updates);
+    }
+    return res.json({
+      success: true,
+      message: 'Tester credentials updated successfully.',
+    });
+  } catch (err: any) {
+    console.error('Error updating user credentials in server:', err);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
