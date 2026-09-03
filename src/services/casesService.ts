@@ -392,6 +392,7 @@ export async function fetchCases(): Promise<MedicalCase[]> {
   if (remoteFetchSuccess && remoteCases.length > 0) {
     // Merge remote cases with local custom cases so newly added cases/images are NEVER lost upon refresh
     const mergedMap = new Map<string, MedicalCase>();
+    const unsyncedCases: MedicalCase[] = [];
     
     // First, populate with remote cases
     remoteCases.forEach(c => {
@@ -405,6 +406,7 @@ export async function fetchCases(): Promise<MedicalCase[]> {
         if (!remote) {
           // Keep local custom cases not yet synced or deleted from remote
           mergedMap.set(lc.id, lc);
+          unsyncedCases.push(lc);
         } else {
           const remoteUpdated = typeof remote.updatedAt === 'number' ? remote.updatedAt : typeof remote.updatedAt === 'string' ? new Date(remote.updatedAt).getTime() : 0;
           const localUpdated = typeof lc.updatedAt === 'number' ? lc.updatedAt : typeof lc.updatedAt === 'string' ? new Date(lc.updatedAt).getTime() : 0;
@@ -412,12 +414,35 @@ export async function fetchCases(): Promise<MedicalCase[]> {
           // Prefer local if it was edited/updated more recently, or has a custom uploaded image (base64) while remote is placeholder
           if (localUpdated > remoteUpdated || (lc.imageUrl?.startsWith('data:') && !remote.imageUrl?.startsWith('data:'))) {
             mergedMap.set(lc.id, lc);
+            unsyncedCases.push(lc);
           }
         }
       }
     });
 
     finalCases = Array.from(mergedMap.values());
+
+    // Automatically sync these back up to Firestore/Backend in the background now that connection is active!
+    if (unsyncedCases.length > 0) {
+      addDiagnosticLog('info', 'sync', `Detected ${unsyncedCases.length} unsynced local custom cases. Syncing to remote database in background...`);
+      Promise.all(
+        unsyncedCases.map(async (uc) => {
+          try {
+            await setDoc(doc(db, COLLECTION_NAME, uc.id), uc);
+            await fetch('/api/cases', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(uc),
+            });
+            addDiagnosticLog('success', 'sync', `Background sync: Successfully uploaded case "${uc.title}" to shared database.`);
+          } catch (syncErr: any) {
+            console.warn(`Background sync failed for case "${uc.title}":`, syncErr);
+          }
+        })
+      ).catch((e) => {
+        console.error("Background sync task failed:", e);
+      });
+    }
   } else {
     // When offline, network unavailable, or Firestore is empty/quota-blocked:
     if (localCustomCases.length > 0) {
