@@ -749,11 +749,10 @@ async function getResilientCases(): Promise<any[]> {
         });
       }
       
-      if (cases.length > 0) {
-        serverCasesCache = cases;
-        lastCacheFetchTime = now;
-        return cases;
-      }
+      // Successfully queried database. Cache the unified baseline + custom cases, and update the fetch time
+      serverCasesCache = [...DEFAULT_BASELINE_CASES, ...cases];
+      lastCacheFetchTime = now;
+      return serverCasesCache;
     }
   } catch (err: any) {
     // Graceful silent fallback to maintain pristine system status when Firestore quota limits are exceeded
