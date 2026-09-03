@@ -306,11 +306,12 @@ export async function fetchCases(): Promise<MedicalCase[]> {
     if (resp.ok) {
       const data = await resp.json();
       if (data.success && Array.isArray(data.cases) && data.cases.length > 0) {
-        remoteCases = data.cases;
+        // Pristine filter: exclude any mistakenly uploaded baseline cases
+        remoteCases = data.cases.filter((c: any) => c && c.id && !c.id.startsWith('baseline-'));
         remoteFetchSuccess = true;
         diagnosticState.connectionStatus = 'connected';
         diagnosticState.remoteFirestoreCount = remoteCases.length;
-        addDiagnosticLog('success', 'sync', `Successfully retrieved ${remoteCases.length} cases from backend API /api/cases.`);
+        addDiagnosticLog('success', 'sync', `Successfully retrieved ${remoteCases.length} custom cases from backend API /api/cases.`);
       } else if (data.error && (data.error.toLowerCase().includes('quota') || data.error.toLowerCase().includes('exceeded'))) {
         isQuotaExceeded = true;
         remoteErrorDesc = data.error;
@@ -339,20 +340,19 @@ export async function fetchCases(): Promise<MedicalCase[]> {
     addDiagnosticLog('info', 'sync', 'Reverting to direct Firestore client-side fetch...');
     try {
       const querySnapshot = await getDocs(collection(db, COLLECTION_NAME));
-      const casesMap = new Map<string, MedicalCase>();
+      const fetchedFromDb: MedicalCase[] = [];
       querySnapshot.forEach((docSnap) => {
         const data = docSnap.data() as MedicalCase;
-        if (data && data.id) {
-          casesMap.set(data.id, data);
+        // Ignore baseline cases stored in Firestore
+        if (data && data.id && !data.id.startsWith('baseline-')) {
+          fetchedFromDb.push(data);
         }
       });
-      remoteCases = Array.from(casesMap.values());
-      if (remoteCases.length > 0) {
-        remoteFetchSuccess = true;
-        diagnosticState.connectionStatus = 'connected';
-        diagnosticState.remoteFirestoreCount = remoteCases.length;
-        addDiagnosticLog('success', 'sync', `Fetched ${remoteCases.length} documents directly from Firestore.`);
-      }
+      remoteCases = fetchedFromDb;
+      remoteFetchSuccess = true;
+      diagnosticState.connectionStatus = 'connected';
+      diagnosticState.remoteFirestoreCount = remoteCases.length;
+      addDiagnosticLog('success', 'sync', `Fetched ${remoteCases.length} custom documents directly from Firestore.`);
     } catch (error: any) {
       remoteErrorDesc = error?.message || String(error);
       const isOffline = remoteErrorDesc.includes('offline') || remoteErrorDesc.includes('unavailable');
@@ -378,6 +378,8 @@ export async function fetchCases(): Promise<MedicalCase[]> {
     if (savedLocal) {
       localCustomCases = JSON.parse(savedLocal);
       if (!Array.isArray(localCustomCases)) localCustomCases = [];
+      // HEAL: Filter out any baseline cases that were mistakenly saved into the custom cases key!
+      localCustomCases = localCustomCases.filter(c => c && c.id && !c.id.startsWith('baseline-'));
     }
   } catch (e) {
     addDiagnosticLog('warn', 'storage', 'Could not parse local custom cases cache from localStorage.');
@@ -389,19 +391,19 @@ export async function fetchCases(): Promise<MedicalCase[]> {
   // 4. Authoritative Source of Truth Selection with Intelligent Merge:
   let finalCases: MedicalCase[] = [];
 
-  if (remoteFetchSuccess && remoteCases.length > 0) {
-    // Merge remote cases with local custom cases so newly added cases/images are NEVER lost upon refresh
+  if (remoteFetchSuccess) {
+    // Merge remote custom cases with local custom cases so newly added cases/images are NEVER lost upon refresh
     const mergedMap = new Map<string, MedicalCase>();
     const unsyncedCases: MedicalCase[] = [];
     
     // First, populate with remote cases
     remoteCases.forEach(c => {
-      if (c && c.id) mergedMap.set(c.id, c);
+      if (c && c.id && !c.id.startsWith('baseline-')) mergedMap.set(c.id, c);
     });
 
     // Then, overlay local cases if they are newer, contain custom local base64/blob images, or don't exist remotely
     localCustomCases.forEach(lc => {
-      if (lc && lc.id) {
+      if (lc && lc.id && !lc.id.startsWith('baseline-')) {
         const remote = mergedMap.get(lc.id);
         if (!remote) {
           // Keep local custom cases not yet synced or deleted from remote
@@ -420,34 +422,39 @@ export async function fetchCases(): Promise<MedicalCase[]> {
       }
     });
 
-    finalCases = Array.from(mergedMap.values());
+    // Combine merged custom cases with the local static baseline cases so we have a unified list
+    const customCases = Array.from(mergedMap.values());
+    finalCases = [...DEFAULT_BASELINE_CASES, ...customCases];
 
     // Automatically sync these back up to Firestore/Backend in the background now that connection is active!
     if (unsyncedCases.length > 0) {
-      addDiagnosticLog('info', 'sync', `Detected ${unsyncedCases.length} unsynced local custom cases. Syncing to remote database in background...`);
-      Promise.all(
-        unsyncedCases.map(async (uc) => {
-          try {
-            await setDoc(doc(db, COLLECTION_NAME, uc.id), uc);
-            await fetch('/api/cases', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(uc),
-            });
-            addDiagnosticLog('success', 'sync', `Background sync: Successfully uploaded case "${uc.title}" to shared database.`);
-          } catch (syncErr: any) {
-            console.warn(`Background sync failed for case "${uc.title}":`, syncErr);
-          }
-        })
-      ).catch((e) => {
-        console.error("Background sync task failed:", e);
-      });
+      const actualUnsynced = unsyncedCases.filter(uc => uc && uc.id && !uc.id.startsWith('baseline-'));
+      if (actualUnsynced.length > 0) {
+        addDiagnosticLog('info', 'sync', `Detected ${actualUnsynced.length} unsynced local custom cases. Syncing to remote database in background...`);
+        Promise.all(
+          actualUnsynced.map(async (uc) => {
+            try {
+              await setDoc(doc(db, COLLECTION_NAME, uc.id), uc);
+              await fetch('/api/cases', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(uc),
+              });
+              addDiagnosticLog('success', 'sync', `Background sync: Successfully uploaded case "${uc.title}" to shared database.`);
+            } catch (syncErr: any) {
+              console.warn(`Background sync failed for case "${uc.title}":`, syncErr);
+            }
+          })
+        ).catch((e) => {
+          console.error("Background sync task failed:", e);
+        });
+      }
     }
   } else {
     // When offline, network unavailable, or Firestore is empty/quota-blocked:
     if (localCustomCases.length > 0) {
-      finalCases = localCustomCases;
-      addDiagnosticLog('info', 'sync', `Using local offline cache (${localCustomCases.length} cases) as network fallback.`);
+      finalCases = [...DEFAULT_BASELINE_CASES, ...localCustomCases];
+      addDiagnosticLog('info', 'sync', `Using local offline cache (${localCustomCases.length} custom cases + baseline) as network fallback.`);
     } else {
       finalCases = DEFAULT_BASELINE_CASES;
       addDiagnosticLog('warn', 'sync', `Firestore/Backend empty or unavailable (e.g. Quota Exceeded). Falling back to ${DEFAULT_BASELINE_CASES.length} high-yield static baseline cases.`);
@@ -459,10 +466,11 @@ export async function fetchCases(): Promise<MedicalCase[]> {
   const sortedCases = sortCasesDeterministically(finalCases);
   const now = Date.now();
 
-  // Update local storage cache to strictly mirror authoritative state
+  // Update local storage cache to strictly mirror custom state ONLY
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sortedCases));
-    diagnosticState.localCacheCount = sortedCases.length;
+    const customOnly = sortedCases.filter(c => c && c.id && !c.id.startsWith('baseline-'));
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(customOnly));
+    diagnosticState.localCacheCount = customOnly.length;
   } catch (e) {
     // ignore
   }

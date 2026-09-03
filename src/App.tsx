@@ -19,7 +19,7 @@ export default function App() {
   const [selectedModality, setSelectedModality] = useState<Modality>('chest_xray');
   const [cases, setCases] = useState<MedicalCase[]>(() => {
     try {
-      const cached = localStorage.getItem('radmed_custom_cases_cache');
+      const cached = localStorage.getItem('radmed_all_cases_initial_cache');
       return cached ? sortCasesDeterministically(JSON.parse(cached)) : [];
     } catch {
       return [];
@@ -100,18 +100,18 @@ export default function App() {
       const fetched = await fetchCases();
       const sorted = sortCasesDeterministically(fetched);
       setCases(sorted);
-      // Explicitly save the results to localStorage after successfully fetching cases
-      localStorage.setItem('radmed_custom_cases_cache', JSON.stringify(sorted));
+      // Explicitly save the results to the initial load cache after successfully fetching cases
+      localStorage.setItem('radmed_all_cases_initial_cache', JSON.stringify(sorted));
     } catch (err) {
       console.warn("Failed to retrieve cases on startup:", err);
-      // Display content immediately using current local cache if network/API fails
+      // Display content immediately using the initial load cache if network/API fails
       try {
-        const cached = localStorage.getItem('radmed_custom_cases_cache');
+        const cached = localStorage.getItem('radmed_all_cases_initial_cache');
         if (cached) {
           setCases(sortCasesDeterministically(JSON.parse(cached)));
         }
       } catch (cacheErr) {
-        console.error("Local storage initialization cache load failed:", cacheErr);
+         console.error("Local storage initialization cache load failed:", cacheErr);
       }
     }
   };

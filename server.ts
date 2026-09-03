@@ -723,12 +723,31 @@ async function getResilientCases(): Promise<any[]> {
     if (db) {
       const snap = await getDocs(collection(db, 'cases'));
       const cases: any[] = [];
+      const baselineDocsToDelete: string[] = [];
+      
       snap.forEach((docSnap) => {
         const data = docSnap.data();
         if (data && data.id) {
-          cases.push(data);
+          if (data.id.startsWith('baseline-')) {
+            baselineDocsToDelete.push(docSnap.id);
+          } else {
+            cases.push(data);
+          }
         }
       });
+      
+      // Proactive background deletion to purge the mistakenly uploaded baseline cases
+      if (baselineDocsToDelete.length > 0) {
+        console.log(`[Database Cleanup] Purging ${baselineDocsToDelete.length} leaked baseline cases from Firestore...`);
+        baselineDocsToDelete.forEach(async (docId) => {
+          try {
+            await deleteDoc(doc(db, 'cases', docId));
+            console.log(`[Database Cleanup] Successfully deleted leaked baseline case: ${docId}`);
+          } catch (delErr) {
+            console.warn(`[Database Cleanup] Failed to delete leaked doc ${docId}:`, delErr);
+          }
+        });
+      }
       
       if (cases.length > 0) {
         serverCasesCache = cases;
