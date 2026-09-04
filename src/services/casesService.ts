@@ -392,45 +392,74 @@ export async function fetchCases(): Promise<MedicalCase[]> {
   diagnosticState.localCacheCount = localCustomCases.length;
   diagnosticState.staticSeedCount = 0;
 
+  // Fetch global deleted baseline case IDs from Firestore settings document so all users globally see the deletions
+  let globalDeletedBaselines: string[] = [];
+  try {
+    const docSnap = await getDoc(doc(db, 'settings', 'deleted_baselines'));
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (data && Array.isArray(data.ids)) {
+        globalDeletedBaselines = data.ids;
+        // Sync with local deleted baselines registry
+        try {
+          const localRaw = localStorage.getItem('radmed_deleted_baseline_cases') || '[]';
+          const localList: string[] = JSON.parse(localRaw);
+          const mergedList = Array.from(new Set([...localList, ...globalDeletedBaselines]));
+          localStorage.setItem('radmed_deleted_baseline_cases', JSON.stringify(mergedList));
+        } catch {}
+      }
+    }
+  } catch (err) {
+    addDiagnosticLog('warn', 'sync', 'Failed to retrieve global deleted baseline registry.');
+  }
+
+  // Compute active baseline cases (excluding any persistently deleted baseline IDs)
+  let activeBaselineCases = DEFAULT_BASELINE_CASES;
+  try {
+    const deletedBaselinesRaw = localStorage.getItem('radmed_deleted_baseline_cases');
+    if (deletedBaselinesRaw) {
+      const deletedBaselines: string[] = JSON.parse(deletedBaselinesRaw);
+      if (Array.isArray(deletedBaselines)) {
+        activeBaselineCases = DEFAULT_BASELINE_CASES.filter(c => c && c.id && !deletedBaselines.includes(c.id));
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
   // 4. Authoritative Source of Truth Selection with Intelligent Merge:
   let finalCases: MedicalCase[] = [];
 
   if (remoteFetchSuccess) {
     // Merge remote custom cases with local custom cases so newly added cases/images are NEVER lost upon refresh
     const mergedMap = new Map<string, MedicalCase>();
-    const unsyncedCases: MedicalCase[] = [];
     
-    // First, populate with remote cases
+    // First, populate with remote cases as the absolute authoritative source of truth
     remoteCases.forEach(c => {
       if (c && c.id && !c.id.startsWith('baseline-')) mergedMap.set(c.id, c);
     });
 
-    // Then, overlay local cases if they are newer, contain custom local base64/blob images, or don't exist remotely
-    localCustomCases.forEach(lc => {
-      if (lc && lc.id && !lc.id.startsWith('baseline-')) {
-        const remote = mergedMap.get(lc.id);
-        if (!remote) {
-          // Keep local custom cases not yet synced or deleted from remote
-          mergedMap.set(lc.id, lc);
-          unsyncedCases.push(lc);
-        } else {
-          const remoteUpdated = typeof remote.updatedAt === 'number' ? remote.updatedAt : typeof remote.updatedAt === 'string' ? new Date(remote.updatedAt).getTime() : 0;
-          const localUpdated = typeof lc.updatedAt === 'number' ? lc.updatedAt : typeof lc.updatedAt === 'string' ? new Date(lc.updatedAt).getTime() : 0;
-          
-          // Prefer local if it was edited/updated more recently, or has a custom uploaded image (base64) while remote is placeholder
-          if (localUpdated > remoteUpdated || (lc.imageUrl?.startsWith('data:') && !remote.imageUrl?.startsWith('data:'))) {
-            mergedMap.set(lc.id, lc);
-            unsyncedCases.push(lc);
-          }
-        }
+    // Only overlay genuinely unsynced cases created offline on this specific device
+    let unsyncedCases: MedicalCase[] = [];
+    try {
+      const unsyncedRaw = localStorage.getItem('radmed_unsynced_cases');
+      if (unsyncedRaw) {
+        unsyncedCases = JSON.parse(unsyncedRaw);
+        if (!Array.isArray(unsyncedCases)) unsyncedCases = [];
+      }
+    } catch {}
+
+    unsyncedCases.forEach(uc => {
+      if (uc && uc.id && !uc.id.startsWith('baseline-')) {
+        mergedMap.set(uc.id, uc);
       }
     });
 
     // Combine merged custom cases with the local static baseline cases so we have a unified list
     const customCases = Array.from(mergedMap.values());
-    finalCases = [...DEFAULT_BASELINE_CASES, ...customCases];
+    finalCases = [...activeBaselineCases, ...customCases];
 
-    // Automatically sync these back up to Firestore/Backend in the background now that connection is active!
+    // Automatically sync genuinely unsynced cases back up to Firestore/Backend in the background now that connection is active!
     if (unsyncedCases.length > 0) {
       const actualUnsynced = unsyncedCases.filter(
         uc => uc && uc.id && !uc.id.startsWith('baseline-') && !syncAttemptedIds.has(uc.id)
@@ -450,6 +479,16 @@ export async function fetchCases(): Promise<MedicalCase[]> {
                 throw new Error(`Server returned status ${resp.status}`);
               }
               addDiagnosticLog('success', 'sync', `Background sync: Successfully uploaded case "${uc.title}" to shared database.`);
+              
+              // Remove from unsynced registry upon successful sync
+              try {
+                const raw = localStorage.getItem('radmed_unsynced_cases');
+                if (raw) {
+                  const list: MedicalCase[] = JSON.parse(raw);
+                  const updated = list.filter(c => c && c.id !== uc.id);
+                  localStorage.setItem('radmed_unsynced_cases', JSON.stringify(updated));
+                }
+              } catch {}
             } catch (syncErr: any) {
               console.warn(`Background sync failed for case "${uc.title}":`, syncErr);
               addDiagnosticLog('warn', 'sync', `Postponed background sync retry for "${uc.title}" to avoid quota spam.`);
@@ -463,12 +502,12 @@ export async function fetchCases(): Promise<MedicalCase[]> {
   } else {
     // When offline, network unavailable, or Firestore is empty/quota-blocked:
     if (localCustomCases.length > 0) {
-      finalCases = [...DEFAULT_BASELINE_CASES, ...localCustomCases];
+      finalCases = [...activeBaselineCases, ...localCustomCases];
       addDiagnosticLog('info', 'sync', `Using local offline cache (${localCustomCases.length} custom cases + baseline) as network fallback.`);
     } else {
-      finalCases = DEFAULT_BASELINE_CASES;
-      addDiagnosticLog('warn', 'sync', `Firestore/Backend empty or unavailable (e.g. Quota Exceeded). Falling back to ${DEFAULT_BASELINE_CASES.length} high-yield static baseline cases.`);
-      diagnosticState.staticSeedCount = DEFAULT_BASELINE_CASES.length;
+      finalCases = activeBaselineCases;
+      addDiagnosticLog('warn', 'sync', `Firestore/Backend empty or unavailable (e.g. Quota Exceeded). Falling back to ${activeBaselineCases.length} high-yield static baseline cases.`);
+      diagnosticState.staticSeedCount = activeBaselineCases.length;
     }
   }
 
@@ -537,8 +576,27 @@ export async function addCaseToFirestore(newCase: MedicalCase): Promise<void> {
       throw new Error(`Server returned status ${resp.status}`);
     }
     addDiagnosticLog('success', 'sync', `Case "${caseToSave.title}" saved successfully through server pipeline.`);
+    
+    // Successfully saved - ensure it is removed from unsynced registry
+    try {
+      const unsyncedRaw = localStorage.getItem('radmed_unsynced_cases');
+      if (unsyncedRaw) {
+        const unsynced: MedicalCase[] = JSON.parse(unsyncedRaw);
+        const updatedUnsynced = unsynced.filter(c => c && c.id !== caseToSave.id);
+        localStorage.setItem('radmed_unsynced_cases', JSON.stringify(updatedUnsynced));
+      }
+    } catch {}
   } catch (backendErr: any) {
     addDiagnosticLog('warn', 'sync', `Backend API save notice: ${backendErr?.message || backendErr}. Attempting direct client-side fallback...`);
+    
+    // Register as pending offline sync since the server save didn't go through
+    try {
+      const unsyncedRaw = localStorage.getItem('radmed_unsynced_cases');
+      const unsynced: MedicalCase[] = unsyncedRaw ? JSON.parse(unsyncedRaw) : [];
+      const updatedUnsynced = [caseToSave, ...unsynced.filter(c => c && c.id !== caseToSave.id)];
+      localStorage.setItem('radmed_unsynced_cases', JSON.stringify(updatedUnsynced));
+    } catch {}
+
     // 3. Fall back to client-side direct Firestore setDoc ONLY if server pipeline is offline/unreachable
     if (checkWriteQuotaPersisted()) {
       addDiagnosticLog('warn', 'sync', 'Firestore write quota exceeded. Direct fallback save skipped to prevent console error.');
@@ -546,6 +604,16 @@ export async function addCaseToFirestore(newCase: MedicalCase): Promise<void> {
       try {
         await setDoc(doc(db, COLLECTION_NAME, caseToSave.id), caseToSave);
         addDiagnosticLog('success', 'sync', `Case "${caseToSave.title}" saved successfully through client-side fallback.`);
+        
+        // Direct save was successful - we can clear it from unsynced registry
+        try {
+          const unsyncedRaw = localStorage.getItem('radmed_unsynced_cases');
+          if (unsyncedRaw) {
+            const unsynced: MedicalCase[] = JSON.parse(unsyncedRaw);
+            const updatedUnsynced = unsynced.filter(c => c && c.id !== caseToSave.id);
+            localStorage.setItem('radmed_unsynced_cases', JSON.stringify(updatedUnsynced));
+          }
+        } catch {}
       } catch (fsErr: any) {
         const msg = fsErr?.message || String(fsErr);
         if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || fsErr?.code === 'resource-exhausted') {
@@ -573,6 +641,43 @@ export async function deleteCaseFromFirestore(caseId: string): Promise<void> {
     }
   } catch (e) {
     // ignore
+  }
+
+  // If it is a baseline/static case, remember it as persistently deleted
+  if (caseId && caseId.startsWith('baseline-')) {
+    try {
+      const deletedBaselinesRaw = localStorage.getItem('radmed_deleted_baseline_cases');
+      const deletedBaselines: string[] = deletedBaselinesRaw ? JSON.parse(deletedBaselinesRaw) : [];
+      if (!deletedBaselines.includes(caseId)) {
+        deletedBaselines.push(caseId);
+        localStorage.setItem('radmed_deleted_baseline_cases', JSON.stringify(deletedBaselines));
+      }
+      addDiagnosticLog('success', 'storage', `Persistently deleted baseline case locally: ${caseId}`);
+    } catch (e) {
+      // ignore
+    }
+
+    // Save baseline deletion globally to Firestore settings so ALL users see this deletion!
+    if (!checkWriteQuotaPersisted()) {
+      try {
+        const docRef = doc(db, 'settings', 'deleted_baselines');
+        const docSnap = await getDoc(docRef);
+        let globalDeleted: string[] = [];
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data && Array.isArray(data.ids)) {
+            globalDeleted = data.ids;
+          }
+        }
+        if (!globalDeleted.includes(caseId)) {
+          globalDeleted.push(caseId);
+          await setDoc(docRef, { ids: globalDeleted });
+          addDiagnosticLog('success', 'sync', `Globally registered baseline case deletion: ${caseId}`);
+        }
+      } catch (err: any) {
+        console.warn('Could not register global baseline deletion:', err);
+      }
+    }
   }
 
   // 2. Perform backend API delete as the primary source of truth (highly cached and safe)
@@ -676,6 +781,26 @@ export async function purgeSampleCases(): Promise<{
     // ignore
   }
 
+  // Register all baseline cases as deleted to hide them from view in a full purge
+  try {
+    const baselineIds = DEFAULT_BASELINE_CASES.map(c => c.id);
+    localStorage.setItem('radmed_deleted_baseline_cases', JSON.stringify(baselineIds));
+    addDiagnosticLog('success', 'storage', 'Successfully purged and hid all default baseline cases.');
+  } catch (e) {
+    // ignore
+  }
+
+  // Register all baseline cases as deleted globally too so all users see this clean state
+  if (!checkWriteQuotaPersisted()) {
+    try {
+      const baselineIds = DEFAULT_BASELINE_CASES.map(c => c.id);
+      await setDoc(doc(db, 'settings', 'deleted_baselines'), { ids: baselineIds });
+      addDiagnosticLog('success', 'sync', 'Successfully registered and hid all default baseline cases globally in Firestore.');
+    } catch (err: any) {
+      console.warn('Could not save global deleted baselines:', err);
+    }
+  }
+
   addDiagnosticLog('success', 'sync', `Purged ${purgedIds.length} sample/demo cases from database and cache.`, { purgedIds });
   notifySubscribers();
 
@@ -695,9 +820,26 @@ export async function reseedFirestoreWithBaselineCases(): Promise<{
   error?: string;
 }> {
   addDiagnosticLog('info', 'sync', 'Synchronizing Firestore case collection...');
+  try {
+    localStorage.removeItem('radmed_deleted_baseline_cases');
+    addDiagnosticLog('success', 'storage', 'Successfully restored/reseeded all default baseline cases.');
+  } catch (e) {
+    // ignore
+  }
+
+  // Clear globally from Firestore too
+  if (!checkWriteQuotaPersisted()) {
+    try {
+      await setDoc(doc(db, 'settings', 'deleted_baselines'), { ids: [] });
+      addDiagnosticLog('success', 'sync', 'Successfully cleared global baseline deletion registry in Firestore.');
+    } catch (err: any) {
+      addDiagnosticLog('warn', 'sync', `Global Firestore baseline setting reset skipped: ${err?.message || err}`);
+    }
+  }
+
   return {
     success: true,
-    count: diagnosticState.lastSyncCaseCount,
+    count: DEFAULT_BASELINE_CASES.length,
   };
 }
 
