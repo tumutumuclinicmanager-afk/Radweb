@@ -145,7 +145,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
           clearInterval(pollInterval);
           clearInterval(timer);
           setPaymentStatus('failed');
-          setErrorMessage('M-Pesa transaction was cancelled or declined. Please retry.');
+          setErrorMessage(result.transaction?.resultDesc || 'M-Pesa transaction was cancelled or declined. Please retry.');
         }
       }, 2500);
     }

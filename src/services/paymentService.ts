@@ -14,13 +14,13 @@ export interface PremiumAccessRecord {
   provider?: string;
 }
 
-// Helper to format PalPluss Basic Auth Header on client-side
+// Helper to format PalPluss Basic Auth Header on client-side (no trailing colon)
 function formatPalPlussBasicAuth(key: string): string {
   const trimmed = (key || '').trim();
   if (!trimmed) return '';
   if (trimmed.startsWith('Basic ')) return trimmed;
   if (typeof window !== 'undefined' && typeof window.btoa === 'function') {
-    return 'Basic ' + window.btoa(`${trimmed}:`);
+    return 'Basic ' + window.btoa(trimmed);
   }
   return 'Basic ' + trimmed;
 }
@@ -229,8 +229,6 @@ export async function initiateMpesaStkPush(phoneNumber: string, amount?: number)
           body: JSON.stringify({
             amount: payable,
             phone: cleanedPhone,
-            phoneNumber: cleanedPhone,
-            reference: 'RadMed Pro',
             accountReference: 'RadMed Pro',
             transactionDesc: 'RadMed Pro',
           }),

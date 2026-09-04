@@ -1527,18 +1527,18 @@ let paymentConfig = {
   accountReference: 'RadMed Pro',
 };
 
-// Helper to format PalPluss Basic Auth Header reliably
+// Helper to format PalPluss Basic Auth Header reliably (PalPluss requires base64 of the raw API key without a colon)
 function getPalPlussAuthHeader(key: string): string {
   const trimmed = (key || '').trim();
   if (!trimmed) return '';
   if (trimmed.startsWith('Basic ')) return trimmed;
-  // If it is already a base64 encoded token (e.g. cHBfbGl2ZV8...)
-  if (trimmed.startsWith('cHBfbGl2ZV8') || (trimmed.endsWith(':') && /^[A-Za-z0-9+/=]+$/.test(trimmed))) {
-    const encoded = trimmed.endsWith(':') ? Buffer.from(trimmed).toString('base64') : trimmed;
-    return `Basic ${encoded}`;
+  // If it is already a base64 encoded token
+  if (trimmed.startsWith('cHBfbGl2ZV8') || (trimmed.length > 40 && /^[A-Za-z0-9+/=]+$/.test(trimmed))) {
+    const rawNoColon = trimmed.endsWith(':') ? trimmed.slice(0, -1) : trimmed;
+    return `Basic ${rawNoColon}`;
   }
-  // Standard API key (e.g. pp_live_... or pk_live_...) -> base64(key:)
-  return 'Basic ' + Buffer.from(`${trimmed}:`).toString('base64');
+  // Standard raw API key (e.g. pp_live_2f9aa2197ab69a9a6915bd538f519a059ffd7e6ca6568b68) -> base64(key)
+  return 'Basic ' + Buffer.from(trimmed).toString('base64');
 }
 
 // Format Kenyan phone number to 254XXXXXXXXX
@@ -1793,13 +1793,14 @@ app.post('/api/payment/mpesa/stkpush', async (req, res) => {
 
         const palplussPayload: Record<string, any> = {
           amount: payableAmount,
-          phoneNumber: formattedPhone,
           phone: formattedPhone,
-          reference: paymentConfig.accountReference.substring(0, 12),
-          accountReference: paymentConfig.accountReference.substring(0, 12),
-          transactionDesc: 'RadMed Pro'.substring(0, 13),
-          callbackUrl: callbackUrl,
+          accountReference: (paymentConfig.accountReference || 'RadMed Pro').substring(0, 12),
+          transactionDesc: 'RadMed Pro',
         };
+
+        if (callbackUrl) {
+          palplussPayload.callbackUrl = callbackUrl;
+        }
 
         if (channelId) {
           palplussPayload.channelId = channelId.trim();
@@ -1825,11 +1826,12 @@ app.post('/api/payment/mpesa/stkpush', async (req, res) => {
           txRecord.checkoutRequestId = liveTxId;
           txRecord.provider = 'palpluss';
           transactionsCache.set(liveTxId, txRecord);
+          transactionsCache.set(checkoutId, txRecord);
 
           return res.json({
             success: true,
             checkoutRequestId: liveTxId,
-            customerMessage: palData.message || `M-Pesa STK Prompt for KES ${payableAmount} sent via PalPluss. Please enter your PIN on your phone.`,
+            customerMessage: palData.data?.resultDescription || palData.message || `M-Pesa STK Prompt for KES ${payableAmount} sent. Please enter your PIN on your phone.`,
             status: 'PENDING',
             provider: 'palpluss',
             mode: 'palpluss_live',
@@ -1968,21 +1970,42 @@ app.get('/api/payment/status/:checkoutRequestId', async (req, res) => {
         const tData = pollData.data || pollData;
         const normalizedStatus = (tData.status || '').toUpperCase();
 
-        if (normalizedStatus === 'SUCCESS' || normalizedStatus === 'COMPLETED') {
+        if (normalizedStatus === 'SUCCESS' || normalizedStatus === 'COMPLETED' || normalizedStatus === 'PAID') {
           tx.status = 'COMPLETED';
-          tx.mpesaReceiptNumber = tData.mpesaReceiptNumber || tData.receiptNumber || tData.reference || `QK${Math.floor(10000000 + Math.random() * 90000000)}`;
+          tx.mpesaReceiptNumber = 
+            tData.mpesa_receipt_number || 
+            tData.mpesaReceiptNumber || 
+            tData.receipt_number || 
+            tData.receiptNumber || 
+            tData.external_reference || 
+            tData.reference || 
+            `QK${Math.floor(10000000 + Math.random() * 90000000)}`;
           tx.updatedAt = new Date().toISOString();
           transactionsCache.set(checkoutRequestId, tx);
+          if (tx.id) transactionsCache.set(tx.id, tx);
 
           const db = getFirestoreDatabase();
           if (db) {
             setDoc(doc(db, 'transactions', checkoutRequestId), tx).catch((e) => console.warn('Firestore tx log warning:', e));
           }
-        } else if (normalizedStatus === 'FAILED' || normalizedStatus === 'CANCELLED' || normalizedStatus === 'EXPIRED') {
+        } else if (
+          normalizedStatus === 'FAILED' || 
+          normalizedStatus === 'CANCELLED' || 
+          normalizedStatus === 'DECLINED' || 
+          normalizedStatus === 'EXPIRED' ||
+          normalizedStatus === 'REJECTED'
+        ) {
           tx.status = 'FAILED';
-          tx.resultDesc = tData.failureReason || tData.message || 'Transaction was cancelled or failed.';
+          tx.resultDesc = 
+            tData.result_desc || 
+            tData.resultDesc || 
+            tData.resultDescription || 
+            tData.failureReason || 
+            tData.message || 
+            'Transaction was cancelled or declined.';
           tx.updatedAt = new Date().toISOString();
           transactionsCache.set(checkoutRequestId, tx);
+          if (tx.id) transactionsCache.set(tx.id, tx);
         }
       }
     } catch (pollErr) {
