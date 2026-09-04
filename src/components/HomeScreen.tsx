@@ -171,18 +171,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         onClick={() => handleCaseClick(c)}
                         className="flex items-center gap-3 p-3 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl cursor-pointer transition-colors"
                       >
-                        <div className="w-12 h-12 rounded-lg bg-slate-200 dark:bg-slate-800 flex-shrink-0 overflow-hidden relative">
+                        <div className="w-12 h-12 rounded-lg bg-slate-900 flex-shrink-0 overflow-hidden relative">
                           <img 
                             src={getSafeImageUrl(c.imageUrl, 200, 80)} 
                             alt={c.imageAlt || c.title} 
                             loading="lazy"
                             referrerPolicy="no-referrer"
                             onError={(e) => handleImageError(e)}
-                            className={`w-full h-full object-cover transition-opacity duration-300 ${locked ? 'blur-xs opacity-60' : ''}`} 
+                            className={`w-full h-full object-cover transition-opacity duration-300 ${locked ? 'blur-xl opacity-10 pointer-events-none select-none' : ''}`} 
                           />
                           {locked && (
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                              <Lock className="w-3.5 h-3.5 text-amber-300" />
+                            <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center">
+                              <Lock className="w-4 h-4 text-amber-400" />
                             </div>
                           )}
                         </div>
@@ -351,12 +351,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         loading="lazy"
                         referrerPolicy="no-referrer"
                         onError={(e) => handleImageError(e)}
-                        className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${
-                          locked ? 'blur-sm opacity-60' : 'opacity-90'
+                        className={`w-full h-full object-cover transition-all duration-500 ${
+                          locked ? 'blur-2xl opacity-10 scale-110 pointer-events-none select-none' : 'opacity-90 group-hover:scale-105'
                         }`} 
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
-                      <div className="absolute top-3 left-3 flex items-center gap-2">
+                      <div className="absolute top-3 left-3 flex items-center gap-2 z-20">
                         <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full text-white backdrop-blur-md ${
                           c.category === 'Emergency Findings' ? 'bg-rose-500/90' : 'bg-blue-600/90'
                         }`}>
@@ -365,27 +365,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       </div>
 
                       {locked ? (
-                        <span className="absolute top-3 right-3 bg-amber-500/95 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full backdrop-blur-md flex items-center gap-1 shadow-md">
+                        <span className="absolute top-3 right-3 bg-amber-500 text-slate-950 text-[10px] font-extrabold px-2.5 py-1 rounded-full backdrop-blur-md flex items-center gap-1 shadow-md z-20">
                           <Lock className="w-3 h-3" /> Pro
                         </span>
                       ) : isReviewed ? (
-                        <span className="absolute top-3 right-3 bg-emerald-500/90 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-md">
+                        <span className="absolute top-3 right-3 bg-emerald-500/90 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-md z-20">
                           ✓ Reviewed
                         </span>
                       ) : null}
 
                       {locked && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center">
-                          <div className="w-10 h-10 rounded-full bg-slate-900/80 border border-amber-400/40 text-amber-400 flex items-center justify-center mb-1 shadow-lg backdrop-blur-md">
+                        <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-xl flex flex-col items-center justify-center p-3 text-center z-10 select-none">
+                          <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-400 flex items-center justify-center mb-1.5 shadow-lg">
                             <Lock className="w-5 h-5" />
                           </div>
-                          <span className="text-[11px] font-bold text-white bg-black/60 px-2.5 py-0.5 rounded-full">
-                            Pay KES 1,000
+                          <span className="text-xs font-bold text-white tracking-wide uppercase">
+                            Radiograph Locked
+                          </span>
+                          <span className="text-[11px] font-semibold text-amber-300 mt-1 bg-amber-950/90 border border-amber-500/40 px-2.5 py-0.5 rounded-full shadow-sm">
+                            Upgrade to Unlock Scan
                           </span>
                         </div>
                       )}
 
-                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
+                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white z-20">
                         <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-black/40 backdrop-blur-md">
                           {c.difficulty}
                         </span>
@@ -508,12 +511,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                         loading="lazy"
                         referrerPolicy="no-referrer"
                         onError={(e) => handleImageError(e)}
-                        className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${
-                          locked ? 'blur-sm opacity-60' : 'opacity-90'
+                        className={`w-full h-full object-cover transition-all duration-500 ${
+                          locked ? 'blur-2xl opacity-10 scale-110 pointer-events-none select-none' : 'opacity-90 group-hover:scale-105'
                         }`} 
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
-                      <div className="absolute top-3 left-3 flex items-center gap-2">
+                      <div className="absolute top-3 left-3 flex items-center gap-2 z-20">
                         <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full text-white backdrop-blur-md ${
                           c.category === 'Emergency Findings' ? 'bg-rose-500/90' : 'bg-indigo-600/90'
                         }`}>
@@ -522,27 +525,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       </div>
 
                       {locked ? (
-                        <span className="absolute top-3 right-3 bg-amber-500/95 text-slate-950 text-[10px] font-extrabold px-2 py-0.5 rounded-full backdrop-blur-md flex items-center gap-1 shadow-md">
+                        <span className="absolute top-3 right-3 bg-amber-500 text-slate-950 text-[10px] font-extrabold px-2.5 py-1 rounded-full backdrop-blur-md flex items-center gap-1 shadow-md z-20">
                           <Lock className="w-3 h-3" /> Pro
                         </span>
                       ) : isReviewed ? (
-                        <span className="absolute top-3 right-3 bg-emerald-500/90 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-md">
+                        <span className="absolute top-3 right-3 bg-emerald-500/90 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-md z-20">
                           ✓ Reviewed
                         </span>
                       ) : null}
 
                       {locked && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center">
-                          <div className="w-10 h-10 rounded-full bg-slate-900/80 border border-amber-400/40 text-amber-400 flex items-center justify-center mb-1 shadow-lg backdrop-blur-md">
+                        <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-xl flex flex-col items-center justify-center p-3 text-center z-10 select-none">
+                          <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-400 flex items-center justify-center mb-1.5 shadow-lg">
                             <Lock className="w-5 h-5" />
                           </div>
-                          <span className="text-[11px] font-bold text-white bg-black/60 px-2.5 py-0.5 rounded-full">
-                            Pay KES 1,000
+                          <span className="text-xs font-bold text-white tracking-wide uppercase">
+                            Head CT Locked
+                          </span>
+                          <span className="text-[11px] font-semibold text-amber-300 mt-1 bg-amber-950/90 border border-amber-500/40 px-2.5 py-0.5 rounded-full shadow-sm">
+                            Upgrade to Unlock Scan
                           </span>
                         </div>
                       )}
 
-                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
+                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white z-20">
                         <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-black/40 backdrop-blur-md">
                           {c.difficulty}
                         </span>

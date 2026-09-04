@@ -272,14 +272,14 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
                       loading="lazy"
                       referrerPolicy="no-referrer"
                       onError={(e) => handleImageError(e)}
-                      className={`w-full h-full object-cover group-hover:scale-105 transition-all duration-500 ${
-                        locked ? 'blur-sm opacity-60' : 'opacity-90 group-hover:opacity-100'
+                      className={`w-full h-full object-cover transition-all duration-500 ${
+                        locked ? 'blur-2xl opacity-10 scale-110 pointer-events-none select-none' : 'opacity-90 group-hover:opacity-100 group-hover:scale-105'
                       }`} 
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
 
                     {/* Top Badges */}
-                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-20">
                       <span className={`text-xs font-bold px-3 py-1 rounded-full shadow-md backdrop-blur-md ${
                         c.category === 'Emergency Findings' 
                           ? 'bg-rose-500/90 text-white' 
@@ -291,7 +291,7 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
                       </span>
 
                       {locked ? (
-                        <span className="flex items-center gap-1 bg-amber-500/95 text-slate-950 text-xs font-extrabold px-2.5 py-1 rounded-full backdrop-blur-md shadow-md">
+                        <span className="flex items-center gap-1 bg-amber-500 text-slate-950 text-xs font-extrabold px-2.5 py-1 rounded-full backdrop-blur-md shadow-md">
                           <Lock className="w-3.5 h-3.5" /> Premium
                         </span>
                       ) : isReviewed ? (
@@ -307,12 +307,15 @@ export const CarouselView: React.FC<CarouselViewProps> = ({
 
                     {/* Locked Center Overlay */}
                     {locked && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center z-10">
-                        <div className="w-12 h-12 rounded-full bg-slate-900/80 border border-amber-400/40 text-amber-400 flex items-center justify-center mb-2 shadow-xl backdrop-blur-md">
+                      <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-xl flex flex-col items-center justify-center p-4 text-center z-10 select-none">
+                        <div className="w-13 h-13 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-400 flex items-center justify-center mb-2 shadow-xl">
                           <Lock className="w-6 h-6" />
                         </div>
-                        <span className="text-xs font-bold text-white uppercase tracking-wider bg-black/60 px-3 py-1 rounded-full backdrop-blur-md">
-                          Unlock Case with M-Pesa
+                        <span className="text-xs font-bold text-white tracking-wide uppercase">
+                          {c.modality === 'chest_xray' ? 'Chest X-Ray' : 'Head CT'} Locked
+                        </span>
+                        <span className="text-xs text-amber-300 font-bold bg-amber-950/90 border border-amber-500/40 px-3 py-1 rounded-full shadow-md mt-1.5">
+                          Unlock with Pro (KES 1,000)
                         </span>
                       </div>
                     )}

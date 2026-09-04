@@ -9,10 +9,13 @@ import {
   Sparkles,
   FileText,
   Brain,
-  HelpCircle
+  HelpCircle,
+  Lock,
+  Smartphone
 } from 'lucide-react';
 import { MedicalCase, Modality } from '../types';
 import { sortCasesDeterministically } from '../services/casesService';
+import { isCaseLocked } from '../services/paymentService';
 import { getSafeImageUrl, handleImageError } from '../lib/imageUtils';
 import { FormattedText } from './FormattedText';
 
@@ -21,6 +24,8 @@ interface FlashcardsViewProps {
   onBackToHome: () => void;
   onMarkReviewed: (id: string) => void;
   reviewedCases: string[];
+  isPremium?: boolean;
+  onOpenPaymentModal?: (category: string, title: string) => void;
 }
 
 export const FlashcardsView: React.FC<FlashcardsViewProps> = ({
@@ -28,6 +33,8 @@ export const FlashcardsView: React.FC<FlashcardsViewProps> = ({
   onBackToHome,
   onMarkReviewed,
   reviewedCases,
+  isPremium = false,
+  onOpenPaymentModal,
 }) => {
   const [modality, setModality] = useState<Modality>('chest_xray');
   const [deck, setDeck] = useState<MedicalCase[]>([]);
@@ -93,6 +100,7 @@ export const FlashcardsView: React.FC<FlashcardsViewProps> = ({
   }
 
   const isKnown = knownCards.includes(currentCard.id) || reviewedCases.includes(currentCard.id);
+  const isCardLocked = isCaseLocked(currentCard, cases, isPremium);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -165,11 +173,15 @@ export const FlashcardsView: React.FC<FlashcardsViewProps> = ({
             <span className="text-xs font-bold px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
               {currentCard.category}
             </span>
-            {isKnown && (
+            {isCardLocked ? (
+              <span className="flex items-center gap-1 text-xs font-bold text-amber-950 bg-amber-400 px-2.5 py-1 rounded-full shadow-sm">
+                <Lock className="w-3 h-3" /> Pro Card
+              </span>
+            ) : isKnown ? (
               <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2.5 py-1 rounded-full">
                 <CheckCircle2 className="w-3.5 h-3.5" /> Known
               </span>
-            )}
+            ) : null}
           </div>
           <span className="text-xs text-slate-400 flex items-center gap-1">
             <RotateCw className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform duration-500" /> Click anywhere to flip
@@ -186,9 +198,31 @@ export const FlashcardsView: React.FC<FlashcardsViewProps> = ({
                   alt={currentCard.imageAlt || currentCard.title}
                   referrerPolicy="no-referrer"
                   onError={(e) => handleImageError(e)}
-                  className="w-full h-full object-cover" 
+                  className={`w-full h-full object-cover transition-all duration-300 ${
+                    isCardLocked ? 'blur-3xl opacity-10 scale-110 pointer-events-none select-none' : ''
+                  }`} 
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent"></div>
+
+                {isCardLocked && (
+                  <div 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenPaymentModal?.(currentCard.category, currentCard.title);
+                    }}
+                    className="absolute inset-0 bg-slate-950/85 backdrop-blur-xl flex flex-col items-center justify-center p-4 text-center z-10 select-none cursor-pointer"
+                  >
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-400 flex items-center justify-center mb-2 shadow-xl">
+                      <Lock className="w-6 h-6" />
+                    </div>
+                    <span className="text-xs font-bold text-white tracking-wide uppercase">
+                      Radiological Scan Locked
+                    </span>
+                    <span className="text-[11px] text-amber-300 font-bold bg-amber-950/90 border border-amber-500/40 px-3 py-1 rounded-full shadow-md mt-2 flex items-center gap-1">
+                      <Smartphone className="w-3.5 h-3.5" /> Unlock with Pro (KES 1,000)
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="max-w-lg mx-auto">
@@ -199,6 +233,29 @@ export const FlashcardsView: React.FC<FlashcardsViewProps> = ({
                   {currentCard.question}
                 </h3>
               </div>
+            </div>
+          ) : isCardLocked ? (
+            <div className="w-full space-y-6 animate-fadeIn text-center max-w-md mx-auto py-8">
+              <div className="w-16 h-16 rounded-3xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto border border-amber-400/40 shadow-xl">
+                <Lock className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                  Diagnostic Answer Locked
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm mx-auto">
+                  Primary diagnosis, key radiological signs, and clinical teaching pearls for this case require Pro access.
+                </p>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenPaymentModal?.(currentCard.category, currentCard.title);
+                }}
+                className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-emerald-600/30 inline-flex items-center gap-2 transition-all cursor-pointer"
+              >
+                <Smartphone className="w-4 h-4" /> Unlock All Flashcards (KES 1,000)
+              </button>
             </div>
           ) : (
             <div className="w-full space-y-6 animate-fadeIn text-left max-w-2xl mx-auto">

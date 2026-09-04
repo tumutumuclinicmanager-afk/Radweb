@@ -271,9 +271,9 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
               {/* Left Column: Image Viewer & Gallery */}
               <div className="lg:col-span-5 flex flex-col gap-4">
                 <div 
-                  onTouchStart={handleMainTouchStart}
-                  onTouchMove={handleMainTouchMove}
-                  onTouchEnd={handleMainTouchEnd}
+                  onTouchStart={isLocked ? undefined : handleMainTouchStart}
+                  onTouchMove={isLocked ? undefined : handleMainTouchMove}
+                  onTouchEnd={isLocked ? undefined : handleMainTouchEnd}
                   className="relative rounded-2xl overflow-hidden bg-slate-950 shadow-lg border border-slate-200 dark:border-slate-800 group"
                 >
                   <img 
@@ -282,60 +282,104 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                     loading="eager"
                     referrerPolicy="no-referrer"
                     onError={(e) => handleImageError(e)}
-                    className="w-full h-80 sm:h-[420px] object-cover transition-all duration-300 cursor-zoom-in"
+                    className={`w-full h-80 sm:h-[420px] object-cover transition-all duration-300 ${
+                      isLocked ? 'blur-3xl opacity-10 scale-110 pointer-events-none select-none' : 'cursor-zoom-in'
+                    }`}
                     onClick={() => {
-                      setZoomLevel(1);
-                      setLightboxOpen(true);
+                      if (!isLocked) {
+                        setZoomLevel(1);
+                        setLightboxOpen(true);
+                      } else {
+                        onOpenPaymentModal(currentCase.category, currentCase.title);
+                      }
                     }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent pointer-events-none"></div>
 
-                  {/* Gallery Swipe Prev / Next Buttons */}
-                  {galleryImages.length > 1 && (
+                  {/* If Locked, show impenetrable Pro lock overlay */}
+                  {isLocked ? (
+                    <div 
+                      onClick={() => onOpenPaymentModal(currentCase.category, currentCase.title)}
+                      className="absolute inset-0 bg-slate-950/85 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center z-20 cursor-pointer select-none group/lock"
+                    >
+                      <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mb-3 border border-amber-400/40 shadow-xl group-hover/lock:scale-105 transition-transform">
+                        <Lock className="w-8 h-8" />
+                      </div>
+                      <span className="text-xs font-extrabold uppercase tracking-widest text-amber-400 mb-1">
+                        Diagnostic Imaging Locked
+                      </span>
+                      <h3 className="text-base sm:text-lg font-bold text-white mb-2 max-w-xs">
+                        Scan Protected with Pro Access
+                      </h3>
+                      <p className="text-xs text-slate-300 max-w-sm mb-4 leading-relaxed">
+                        High-resolution radiograph, multi-view series, zoom inspection, and full radiological annotations require Pro access.
+                      </p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenPaymentModal(currentCase.category, currentCase.title);
+                        }}
+                        className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition-all cursor-pointer"
+                      >
+                        <Smartphone className="w-4 h-4" /> Unlock via M-Pesa (KES 1,000)
+                      </button>
+                    </div>
+                  ) : (
                     <>
+                      {/* Gallery Swipe Prev / Next Buttons */}
+                      {galleryImages.length > 1 && (
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handlePrevGalleryImage(); }}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-900 text-white p-2 rounded-full shadow-lg backdrop-blur-sm transition-all opacity-80 group-hover:opacity-100 z-10"
+                            title="Previous Gallery Image"
+                          >
+                            <ChevronLeft className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleNextGalleryImage(); }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-900 text-white p-2 rounded-full shadow-lg backdrop-blur-sm transition-all opacity-80 group-hover:opacity-100 z-10"
+                            title="Next Gallery Image"
+                          >
+                            <ChevronRight className="w-5 h-5" />
+                          </button>
+                        </>
+                      )}
+                      
+                      {/* Zoom Action Overlay Button */}
                       <button
-                        onClick={(e) => { e.stopPropagation(); handlePrevGalleryImage(); }}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-900 text-white p-2 rounded-full shadow-lg backdrop-blur-sm transition-all opacity-80 group-hover:opacity-100 z-10"
-                        title="Previous Gallery Image"
+                        onClick={() => {
+                          setZoomLevel(1);
+                          setLightboxOpen(true);
+                        }}
+                        className="absolute top-3 left-3 bg-slate-900/80 hover:bg-slate-900 text-white p-2.5 rounded-xl shadow-lg backdrop-blur-sm transition-all flex items-center gap-1.5 text-xs font-semibold z-10"
+                        title="Click to Zoom & Inspect Finer Details"
                       >
-                        <ChevronLeft className="w-5 h-5" />
+                        <ZoomIn className="w-4 h-4 text-blue-400" />
+                        <span>Zoom</span>
                       </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleNextGalleryImage(); }}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 bg-slate-900/80 hover:bg-slate-900 text-white p-2 rounded-full shadow-lg backdrop-blur-sm transition-all opacity-80 group-hover:opacity-100 z-10"
-                        title="Next Gallery Image"
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
+
+                      <div className="absolute bottom-3 left-3 right-3 text-white">
+                        <p className="text-xs font-medium opacity-90">{selectedCaption}</p>
+                        {galleryImages.length > 1 && (
+                          <p className="text-[10px] text-blue-400 mt-0.5">Swipe left/right or use arrows to view gallery photos ({galleryImages.findIndex(i => i.url === selectedImgUrl) + 1} of {galleryImages.length})</p>
+                        )}
+                      </div>
                     </>
                   )}
-                  
-                  {/* Zoom Action Overlay Button */}
-                  <button
-                    onClick={() => {
-                      setZoomLevel(1);
-                      setLightboxOpen(true);
-                    }}
-                    className="absolute top-3 left-3 bg-slate-900/80 hover:bg-slate-900 text-white p-2.5 rounded-xl shadow-lg backdrop-blur-sm transition-all flex items-center gap-1.5 text-xs font-semibold z-10"
-                    title="Click to Zoom & Inspect Finer Details"
-                  >
-                    <ZoomIn className="w-4 h-4 text-blue-400" />
-                    <span>Zoom</span>
-                  </button>
-
-                  <div className="absolute bottom-3 left-3 right-3 text-white">
-                    <p className="text-xs font-medium opacity-90">{selectedCaption}</p>
-                    {galleryImages.length > 1 && (
-                      <p className="text-[10px] text-blue-400 mt-0.5">Swipe left/right or use arrows to view gallery photos ({galleryImages.findIndex(i => i.url === selectedImgUrl) + 1} of {galleryImages.length})</p>
-                    )}
-                  </div>
                 </div>
 
                 {/* Dedicated Bottom Title & Diagnosis Banner */}
                 <div className="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-4 shadow-sm">
-                  <span className="text-[10px] uppercase tracking-wider font-bold text-blue-600 dark:text-blue-400 block mb-0.5">Image Title & Diagnosis</span>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">{currentCase.title}</h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">{selectedCaption}</p>
+                  <span className={`text-[10px] uppercase tracking-wider font-bold block mb-0.5 ${isLocked ? 'text-amber-500' : 'text-blue-600 dark:text-blue-400'}`}>
+                    {isLocked ? 'Pro Case Access' : 'Image Title & Diagnosis'}
+                  </span>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    {isLocked ? 'Case Diagnosis & Findings Protected' : currentCase.title}
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                    {isLocked ? 'Unlock this case to view complete diagnostic images, teaching pearls, and radiological signs.' : selectedCaption}
+                  </p>
                 </div>
 
                 {/* Gallery Thumbnails Strip */}
@@ -343,18 +387,27 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1 font-medium">
                       <span>Condition Image Gallery ({galleryImages.length} views)</span>
-                      <span className="text-blue-600 dark:text-blue-400">Click to preview</span>
+                      <span className={isLocked ? "text-amber-500 font-semibold" : "text-blue-600 dark:text-blue-400"}>
+                        {isLocked ? "Locked with Pro" : "Click to preview"}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
                       {galleryImages.map((img, idx) => (
                         <button
                           key={idx}
+                          disabled={isLocked}
                           onClick={() => {
-                            setSelectedImgUrl(img.url);
-                            setSelectedCaption(img.caption);
+                            if (isLocked) {
+                              onOpenPaymentModal(currentCase.category, currentCase.title);
+                            } else {
+                              setSelectedImgUrl(img.url);
+                              setSelectedCaption(img.caption);
+                            }
                           }}
                           className={`relative w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 border-2 transition-all ${
-                            selectedImgUrl === img.url
+                            isLocked
+                              ? 'border-slate-800 opacity-40 cursor-not-allowed'
+                              : selectedImgUrl === img.url
                               ? 'border-blue-600 ring-2 ring-blue-600/30 scale-105'
                               : 'border-slate-300 dark:border-slate-700 opacity-70 hover:opacity-100'
                           }`}
@@ -365,8 +418,13 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                             loading="lazy"
                             referrerPolicy="no-referrer"
                             onError={(e) => handleImageError(e)}
-                            className="w-full h-full object-cover" 
+                            className={`w-full h-full object-cover ${isLocked ? 'blur-md opacity-20 pointer-events-none select-none' : ''}`} 
                           />
+                          {isLocked && (
+                            <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center">
+                              <Lock className="w-4 h-4 text-amber-400" />
+                            </div>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -856,7 +914,7 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
       </div>
 
       {/* Lightbox / Zoom Modal for Finer Details */}
-      {lightboxOpen && (
+      {lightboxOpen && !isLocked && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4 overflow-auto">
           <div className="relative w-full max-w-5xl flex flex-col items-center justify-center min-h-[90vh]">
             

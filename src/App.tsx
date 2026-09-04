@@ -244,6 +244,8 @@ export default function App() {
                 onBackToHome={() => setActiveView('home')}
                 onMarkReviewed={handleMarkReviewed}
                 reviewedCases={reviewedCases}
+                isPremium={isPremium}
+                onOpenPaymentModal={handleOpenPaymentModal}
               />
             )}
 
