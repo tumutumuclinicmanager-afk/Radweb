@@ -46,43 +46,25 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// Global write quota circuit breaker to prevent client-side write units console errors
+// Write quota circuit breaker state
 let writeQuotaExceeded = false;
 
 export function tripWriteQuota() {
   if (!writeQuotaExceeded) {
     writeQuotaExceeded = true;
-    console.warn('[Quota Shield] Write quota limit hit. Engaging write circuit breaker and disabling remote firestore network sync.');
-    try {
-      localStorage.setItem('radmed_write_quota_exceeded_timestamp', Date.now().toString());
-    } catch {}
-    if (typeof window !== 'undefined' && db) {
-      disableNetwork(db).catch(() => {});
-    }
+    console.warn('[Quota Shield] Firestore quota notice received. System utilizing resilient server cache.');
   }
 }
 
 export function checkWriteQuotaPersisted(): boolean {
+  // If tripped in this active session, return true
   if (writeQuotaExceeded) {
-    if (typeof window !== 'undefined' && db) {
-      disableNetwork(db).catch(() => {});
-    }
     return true;
   }
+  // Clear any legacy 24h lockout timestamps that desynchronized browsers
   try {
-    const saved = localStorage.getItem('radmed_write_quota_exceeded_timestamp');
-    if (saved) {
-      const timestamp = parseInt(saved, 10);
-      // Quota resets daily, check if it was within 24 hours
-      if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
-        writeQuotaExceeded = true;
-        if (typeof window !== 'undefined' && db) {
-          disableNetwork(db).catch(() => {});
-        }
-        return true;
-      } else {
-        localStorage.removeItem('radmed_write_quota_exceeded_timestamp');
-      }
+    if (localStorage.getItem('radmed_write_quota_exceeded_timestamp')) {
+      localStorage.removeItem('radmed_write_quota_exceeded_timestamp');
     }
   } catch {}
   return false;

@@ -20,7 +20,15 @@ export default function App() {
   const [cases, setCases] = useState<MedicalCase[]>(() => {
     try {
       const cached = localStorage.getItem('radmed_all_cases_initial_cache');
-      return cached ? sortCasesDeterministically(JSON.parse(cached)) : [];
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          return sortCasesDeterministically(
+            parsed.filter((c: any) => c && c.id && !c.id.startsWith('baseline-') && !c.id.startsWith('sample-') && !c.id.startsWith('mock-'))
+          );
+        }
+      }
+      return [];
     } catch {
       return [];
     }

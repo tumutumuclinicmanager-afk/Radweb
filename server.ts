@@ -87,17 +87,12 @@ async function updateDoc(docRef: any, data: any) {
 }
 
 async function deleteDoc(docRef: any) {
-  if (serverWriteQuotaExceeded) {
-    console.info('[Server Quota Shield] Skipping deleteDoc write due to active write quota circuit breaker.');
-    return;
-  }
   try {
     await rawDeleteDoc(docRef);
   } catch (err: any) {
     const msg = err?.message || String(err);
     if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('exceeded') || err?.code === 'resource-exhausted') {
-      serverWriteQuotaExceeded = true;
-      console.warn('[Server Quota Shield] Engaging server write circuit breaker due to exceeded quota. Aborting delete gracefully.');
+      console.warn('[Server Quota Shield] Quota limit encountered on deleteDoc. Memory cache updated.');
       return;
     }
     throw err;
@@ -771,7 +766,7 @@ app.get('/api/admin/n8n-info', (req, res) => {
 });
 
 // In-memory server-side cases cache to survive Firestore quota limit failures and reduce daily read units
-let serverCasesCache: any[] = [...DEFAULT_BASELINE_CASES];
+let serverCasesCache: any[] = [];
 let lastCacheFetchTime = 0;
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes cache TTL
 
@@ -793,29 +788,24 @@ async function getResilientCases(): Promise<any[]> {
       snap.forEach((docSnap) => {
         const data = docSnap.data();
         if (data && data.id) {
-          if (!data.id.startsWith('baseline-')) {
+          // Never include synthetic baseline or mock cases
+          if (!data.id.startsWith('baseline-') && !data.id.startsWith('sample-') && !data.id.startsWith('mock-')) {
             cases.push(data);
           }
         }
       });
       
-      // Successfully queried database. Cache the unified baseline + custom cases, and update the fetch time
-      serverCasesCache = [...DEFAULT_BASELINE_CASES, ...cases];
+      // Successfully queried database. Cache the authentic user cases, and update the fetch time
+      serverCasesCache = cases;
       lastCacheFetchTime = now;
       return serverCasesCache;
     }
   } catch (err: any) {
-    // Graceful silent fallback to maintain pristine system status when Firestore quota limits are exceeded
-    console.log('[Resilient System] Switched to fresh in-memory / local baseline cache safely.');
+    console.warn('[Resilient System] Firestore query notice, serving active in-memory cache:', err?.message || err);
   }
 
-  // If Firestore failed, but we have a non-empty memory cache (even if expired), return that
-  if (serverCasesCache.length > 0) {
-    return serverCasesCache;
-  }
-
-  // Absolute fallback to beautiful baseline cases so the app is NEVER blank
-  return DEFAULT_BASELINE_CASES;
+  // If Firestore failed, return existing memory cache
+  return serverCasesCache;
 }
 
 // Update cache helper when write events occur
@@ -840,8 +830,30 @@ app.get('/api/cases', async (req, res) => {
     return res.json({ success: true, count: cases.length, cases });
   } catch (err: any) {
     console.error('Error in /api/cases GET:', err);
-    // Absolute recovery
-    return res.json({ success: true, count: DEFAULT_BASELINE_CASES.length, cases: DEFAULT_BASELINE_CASES });
+    return res.json({ success: true, count: serverCasesCache.length, cases: serverCasesCache });
+  }
+});
+
+// DELETE /api/cases/:id: Client/App endpoint to delete a case directly
+app.delete('/api/cases/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    removeInMemoryCache(id);
+    const db = getFirestoreDatabase();
+    if (db) {
+      await deleteDoc(doc(db, 'cases', id)).catch((e) => {
+        console.warn('Silent notice: Firestore delete deferred:', e.message || e);
+      });
+    }
+    return res.json({
+      success: true,
+      action: 'deleted',
+      caseId: id,
+      message: `Case "${id}" removed.`,
+    });
+  } catch (err: any) {
+    console.error('Error deleting case in /api/cases/:id:', err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
