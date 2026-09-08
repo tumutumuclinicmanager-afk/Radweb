@@ -23,7 +23,8 @@ import {
   Mail,
   MessageSquare,
   Copy,
-  Check
+  Check,
+  TrendingUp
 } from 'lucide-react';
 import { ActiveView, Modality, MedicalCase } from '../types';
 import { isCaseLocked, FREE_CXR_LIMIT, FREE_CT_LIMIT } from '../services/paymentService';
@@ -39,6 +40,7 @@ interface HomeScreenProps {
   reviewedCases: string[];
   isPremium: boolean;
   onOpenPaymentModal: (category?: string, caseTitle?: string) => void;
+  isLoadingCases?: boolean;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -49,6 +51,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   reviewedCases,
   isPremium,
   onOpenPaymentModal,
+  isLoadingCases = false,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<MedicalCase[]>([]);
@@ -316,19 +319,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             style={{ scrollBehavior: 'smooth' }}
           >
             {cxrCases.length === 0 ? (
-              <div className="w-full py-12 px-6 rounded-3xl border border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 flex flex-col items-center justify-center text-center">
-                <Layers className="w-10 h-10 text-blue-500 mb-3 opacity-60" />
-                <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1">No Chest X-Ray Cases in Database</h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mb-4">
-                  Your Firestore database is currently ready for new cases. Upload clinical imaging or generate curated cases using the AI Agent.
-                </p>
-                <button
-                  onClick={() => setActiveView('admin')}
-                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5" /> Go to Admin Studio
-                </button>
-              </div>
+              isLoadingCases ? (
+                <div className="flex gap-6 overflow-x-auto pb-4 pt-2 px-1 scrollbar-none w-full">
+                  {[1, 2, 3, 4].map((n) => (
+                    <div key={n} className="flex-shrink-0 w-80 bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-xl border border-slate-200/80 dark:border-slate-800 animate-pulse">
+                      <div className="h-56 bg-slate-200 dark:bg-slate-800 relative flex items-center justify-center">
+                        <Layers className="w-8 h-8 text-blue-500/30 animate-pulse" />
+                      </div>
+                      <div className="p-5 space-y-3">
+                        <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-3/4"></div>
+                        <div className="h-3 bg-slate-100 dark:bg-slate-800/60 rounded w-full"></div>
+                        <div className="h-3 bg-slate-100 dark:bg-slate-800/60 rounded w-1/2"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="w-full py-12 px-6 rounded-3xl border border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 flex flex-col items-center justify-center text-center">
+                  <Layers className="w-10 h-10 text-blue-500 mb-3 opacity-60" />
+                  <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1">No Chest X-Ray Cases in Database</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mb-4">
+                    Your Firestore database is currently ready for new cases. Upload clinical imaging or generate curated cases using the AI Agent.
+                  </p>
+                  <button
+                    onClick={() => setActiveView('admin')}
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" /> Go to Admin Studio
+                  </button>
+                </div>
+              )
             ) : (
               cxrCases.map((c) => {
                 const isReviewed = reviewedCases.includes(c.id);
@@ -476,19 +496,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             style={{ scrollBehavior: 'smooth' }}
           >
             {ctCases.length === 0 ? (
-              <div className="w-full py-12 px-6 rounded-3xl border border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 flex flex-col items-center justify-center text-center">
-                <Brain className="w-10 h-10 text-indigo-500 mb-3 opacity-60" />
-                <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1">No Head CT Cases in Database</h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mb-4">
-                  Your Firestore database is currently ready for new cases. Upload clinical imaging or generate curated cases using the AI Agent.
-                </p>
-                <button
-                  onClick={() => setActiveView('admin')}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5" /> Go to Admin Studio
-                </button>
-              </div>
+              isLoadingCases ? (
+                <div className="flex gap-6 overflow-x-auto pb-6 pt-2 px-1 scrollbar-none w-full">
+                  {[1, 2, 3, 4].map((n) => (
+                    <div key={n} className="flex-shrink-0 w-80 bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-xl border border-slate-200/80 dark:border-slate-800 animate-pulse">
+                      <div className="h-56 bg-slate-200 dark:bg-slate-800 relative flex items-center justify-center">
+                        <Brain className="w-8 h-8 text-indigo-500/30 animate-pulse" />
+                      </div>
+                      <div className="p-5 space-y-3">
+                        <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-3/4"></div>
+                        <div className="h-3 bg-slate-100 dark:bg-slate-800/60 rounded w-full"></div>
+                        <div className="h-3 bg-slate-100 dark:bg-slate-800/60 rounded w-1/2"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="w-full py-12 px-6 rounded-3xl border border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 flex flex-col items-center justify-center text-center">
+                  <Brain className="w-10 h-10 text-indigo-500 mb-3 opacity-60" />
+                  <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-1">No Head CT Cases in Database</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mb-4">
+                    Your Firestore database is currently ready for new cases. Upload clinical imaging or generate curated cases using the AI Agent.
+                  </p>
+                  <button
+                    onClick={() => setActiveView('admin')}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" /> Go to Admin Studio
+                  </button>
+                </div>
+              )
             ) : (
               ctCases.map((c) => {
                 const isReviewed = reviewedCases.includes(c.id);
@@ -594,9 +631,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <Award className="w-5 h-5 text-blue-500" />
               <span><strong>{totalCases}</strong> Expert Cases</span>
             </div>
-            <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+            <div 
+              onClick={() => setActiveView('progress')}
+              className="flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors group"
+              title="Open My Progress & CME Mastery Dashboard"
+            >
+              <CheckCircle2 className="w-5 h-5 text-emerald-500 group-hover:scale-110 transition-transform" />
               <span><strong>{progressPercent}%</strong> Mastered ({reviewedCount}/{totalCases})</span>
+              <span className="text-xs text-blue-500 underline font-semibold ml-0.5">View →</span>
             </div>
             <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
               <Stethoscope className="w-5 h-5 text-indigo-500" />
@@ -605,7 +647,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
 
           {/* Secondary Navigation Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div
+              onClick={() => setActiveView('progress')}
+              className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-xl border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 transition-all cursor-pointer flex items-center gap-4 group"
+            >
+              <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/80 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform flex-shrink-0">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-blue-600 transition-colors">
+                  My Progress
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {progressPercent}% mastered • Modality chart & log.
+                </p>
+              </div>
+            </div>
+
             <div
               onClick={() => setActiveView('flashcards')}
               className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-xl border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 transition-all cursor-pointer flex items-center gap-4 group"

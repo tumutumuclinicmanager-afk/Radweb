@@ -4,6 +4,12 @@ import { MedicalCase } from '../types';
 import { DEFAULT_BASELINE_CASES } from './baselineCases';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { isDataOrBlobUrl } from '../lib/imageUtils';
+import { 
+  getCasesFromIndexedDB, 
+  saveCasesToIndexedDB, 
+  saveSingleCaseToIndexedDB, 
+  removeCaseFromIndexedDB 
+} from './caseDb';
 
 const COLLECTION_NAME = 'cases';
 const LOCAL_STORAGE_KEY = 'radmed_custom_cases_cache';
@@ -375,18 +381,22 @@ export async function fetchCases(): Promise<MedicalCase[]> {
     showOfflineToast();
   }
 
-  // 3. Load locally cached custom cases from localStorage
+  // 3. Load locally cached custom cases from IndexedDB with localStorage fallback
   let localCustomCases: MedicalCase[] = [];
   try {
-    const savedLocal = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (savedLocal) {
-      localCustomCases = JSON.parse(savedLocal);
-      if (!Array.isArray(localCustomCases)) localCustomCases = [];
-      // HEAL: Filter out any baseline cases that were mistakenly saved into the custom cases key!
-      localCustomCases = localCustomCases.filter(c => c && c.id && !c.id.startsWith('baseline-'));
+    const idbCases = await getCasesFromIndexedDB();
+    if (Array.isArray(idbCases) && idbCases.length > 0) {
+      localCustomCases = idbCases;
+    } else {
+      const savedLocal = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (savedLocal) {
+        localCustomCases = JSON.parse(savedLocal);
+      }
     }
+    if (!Array.isArray(localCustomCases)) localCustomCases = [];
+    localCustomCases = localCustomCases.filter(c => c && c.id && !c.id.startsWith('baseline-') && !c.id.startsWith('sample-') && !c.id.startsWith('mock-'));
   } catch (e) {
-    addDiagnosticLog('warn', 'storage', 'Could not parse local custom cases cache from localStorage.');
+    addDiagnosticLog('warn', 'storage', 'Could not parse local custom cases cache.');
   }
 
   diagnosticState.localCacheCount = localCustomCases.length;
@@ -471,13 +481,30 @@ export async function fetchCases(): Promise<MedicalCase[]> {
   const sortedCases = sortCasesDeterministically(finalCases);
   const now = Date.now();
 
-  // Update local storage cache to strictly mirror custom state ONLY
+  // Update IndexedDB cache asynchronously (holds complete cases with full base64 images without quota limits)
   try {
     const customOnly = sortedCases.filter(c => c && c.id && !c.id.startsWith('baseline-'));
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(customOnly));
+    saveCasesToIndexedDB(customOnly).catch((e) => console.warn('[IndexedDB] saveCases error:', e));
     diagnosticState.localCacheCount = customOnly.length;
   } catch (e) {
     // ignore
+  }
+
+  // Update localStorage with lightweight manifest (strip heavy gallery base64 arrays to strictly stay within browser 5MB quota)
+  try {
+    const customOnly = sortedCases.filter(c => c && c.id && !c.id.startsWith('baseline-'));
+    const lightweightCopy = customOnly.map(c => {
+      const gCount = c.galleryCount || (Array.isArray(c.galleryImages) ? c.galleryImages.length : 0);
+      const { galleryImages, ...rest } = c;
+      return {
+        ...rest,
+        galleryCount: gCount,
+      };
+    });
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(lightweightCopy));
+    localStorage.setItem('radmed_all_cases_initial_cache', JSON.stringify(lightweightCopy));
+  } catch (e) {
+    // Graceful fallback if localStorage is full
   }
 
   diagnosticState.lastSuccessfulSyncTimestamp = now;
@@ -510,11 +537,18 @@ export async function addCaseToFirestore(newCase: MedicalCase): Promise<void> {
   addDiagnosticLog('info', 'sync', `Saving case "${caseToSave.title}" (ID: ${caseToSave.id}) to storage...`);
 
   // 1. Always update local cache immediately for zero-latency UI update
+  saveSingleCaseToIndexedDB(caseToSave).catch((e) => console.warn('[IndexedDB] Single case save:', e));
   try {
     const savedLocal = localStorage.getItem(LOCAL_STORAGE_KEY);
     const localCases: MedicalCase[] = savedLocal ? JSON.parse(savedLocal) : [];
     const updated = sortCasesDeterministically([caseToSave, ...localCases.filter(c => c.id !== caseToSave.id)]);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
+    const lightweightCopy = updated.map(c => {
+      if (c.galleryImages && c.galleryImages.length > 2) {
+        return { ...c, galleryImages: c.galleryImages.slice(0, 1) };
+      }
+      return c;
+    });
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(lightweightCopy));
     diagnosticState.localCacheCount = updated.length;
     addDiagnosticLog('info', 'storage', `Case "${caseToSave.title}" saved to local cache.`);
   } catch (e) {
@@ -587,6 +621,7 @@ export async function deleteCaseFromFirestore(caseId: string): Promise<void> {
   addDiagnosticLog('info', 'sync', `Deleting case ID: ${caseId}...`);
 
   // Remove from local cache immediately
+  removeCaseFromIndexedDB(caseId).catch((e) => console.warn('[IndexedDB] Delete error:', e));
   try {
     const savedLocal = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (savedLocal) {
@@ -1112,5 +1147,52 @@ export async function executeDatabaseCliCommand(
       };
   }
 }
+
+/**
+ * High-speed single case fetcher: gets complete case with all gallery images
+ */
+export async function fetchCaseById(caseId: string): Promise<MedicalCase | null> {
+  try {
+    const resp = await fetch(`/api/cases/${encodeURIComponent(caseId)}`);
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.success && data.case) {
+        return data.case as MedicalCase;
+      }
+    }
+  } catch (err) {
+    console.warn(`[casesService] Error fetching single case ${caseId}:`, err);
+  }
+  return null;
+}
+
+let hasPrefetchedFullCases = false;
+/**
+ * Asynchronously prefetches full case datasets in background without blocking UI
+ */
+export function triggerBackgroundFullCasesPrefetch(onFullCasesLoaded?: (cases: MedicalCase[]) => void): void {
+  if (hasPrefetchedFullCases) return;
+  hasPrefetchedFullCases = true;
+
+  const idleRunner = typeof window !== 'undefined' && 'requestIdleCallback' in window 
+    ? (window as any).requestIdleCallback 
+    : (cb: () => void) => setTimeout(cb, 1500);
+
+  idleRunner(() => {
+    fetch('/api/cases?full=true')
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.cases) && data.cases.length > 0) {
+          const valid = data.cases.filter((c: any) => c && c.id && !c.id.startsWith('baseline-'));
+          saveCasesToIndexedDB(valid).catch(() => {});
+          if (onFullCasesLoaded) {
+            onFullCasesLoaded(valid);
+          }
+        }
+      })
+      .catch(() => {});
+  });
+}
+
 
 

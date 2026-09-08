@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import path from 'path';
 import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
@@ -38,6 +39,9 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// High-performance gzip/deflate compression for massive JSON & medical imaging payloads
+app.use(compression());
 
 // Body parser middleware with generous limits for medical imaging base64
 app.use(express.json({ limit: '30mb' }));
@@ -901,10 +905,45 @@ function removeInMemoryCache(caseId: string) {
 app.get('/api/cases', async (req, res) => {
   try {
     const cases = await getResilientCases();
-    return res.json({ success: true, count: cases.length, cases });
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    
+    // When full=true is explicitly requested (e.g. background prefetch or admin), return full dataset
+    if (req.query.full === 'true') {
+      return res.json({ success: true, count: cases.length, cases });
+    }
+
+    // High-performance default listing mode: Return all authentic clinical cases, complete metadata,
+    // and primary high-res imageUrl, omitting heavy secondary gallery arrays for sub-second page loads
+    const optimizedCases = cases.map(c => {
+      const gCount = Array.isArray(c.galleryImages) ? c.galleryImages.length : 0;
+      const { galleryImages, ...rest } = c;
+      return {
+        ...rest,
+        galleryCount: gCount,
+      };
+    });
+
+    return res.json({ success: true, count: optimizedCases.length, cases: optimizedCases });
   } catch (err: any) {
     console.error('Error in /api/cases GET:', err);
+    res.setHeader('Cache-Control', 'public, max-age=10');
     return res.json({ success: true, count: serverCasesCache.length, cases: serverCasesCache });
+  }
+});
+
+// GET /api/cases/:id: High-speed single case fetch with complete gallery images
+app.get('/api/cases/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const cases = await getResilientCases();
+    const found = cases.find(c => c.id === id);
+    if (!found) {
+      return res.status(404).json({ success: false, error: 'Case not found' });
+    }
+    res.setHeader('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
+    return res.json({ success: true, case: found });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message || 'Server error' });
   }
 });
 
@@ -2272,6 +2311,13 @@ async function setupServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`RadMed Full-Stack Server running on port ${PORT}`);
+
+    // Asynchronously pre-warm real cases cache into memory on boot so requests take <50ms
+    getResilientCases().then((loaded) => {
+      console.log(`[Cache Warmup] Pre-warmed ${loaded.length} authentic cases into memory.`);
+    }).catch((err) => {
+      console.warn('[Cache Warmup] Background cache pre-warm deferred:', err.message || err);
+    });
   });
 }
 

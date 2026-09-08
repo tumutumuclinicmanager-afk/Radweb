@@ -22,13 +22,14 @@ export interface MedicalCase {
   createdAt?: number | string;
   updatedAt?: number | string;
   galleryImages?: { url: string; caption: string }[];
+  galleryCount?: number;
   caseScenario?: string;
   caseScenarioImageUrl?: string;
   caseScenarioImageCaption?: string;
   caseExample?: string;
 }
 
-export type ActiveView = 'home' | 'cases' | 'flashcards' | 'disclaimer' | 'quiz' | 'admin' | 'interpretation';
+export type ActiveView = 'home' | 'cases' | 'flashcards' | 'disclaimer' | 'quiz' | 'admin' | 'interpretation' | 'progress';
 
 export type PaymentProvider = 'palpluss' | 'mpesa_daraja' | 'manual_mpesa' | 'paystack' | 'stripe';
 
@@ -75,5 +76,6 @@ export interface UserProfile {
   unlockedAt?: string;
   provider?: string;
   createdAt?: string;
+  reviewedCases?: string[];
 }
 

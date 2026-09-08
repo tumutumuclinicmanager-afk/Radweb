@@ -54,9 +54,9 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
   const { indexInCategory, totalInCategory } = getCaseCategoryIndex(currentCase, allCases);
 
   // Gallery image selection state
+  const [loadedGallery, setLoadedGallery] = useState<{ url: string; caption: string }[]>(currentCase.galleryImages || []);
   const [selectedImgUrl, setSelectedImgUrl] = useState<string>(currentCase.imageUrl);
   const [selectedCaption, setSelectedCaption] = useState<string>(currentCase.imageAlt);
-
 
   // Lightbox zoom modal state
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -73,6 +73,21 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
     setSelectedCaption(currentCase.imageAlt || currentCase.title);
     setZoomLevel(1);
     setPanOffset({ x: 0, y: 0 });
+    setLoadedGallery(currentCase.galleryImages || []);
+
+    // If case has additional gallery images that were stripped during fast initial load, fetch them dynamically
+    const gCount = currentCase.galleryCount ?? (currentCase.galleryImages ? currentCase.galleryImages.length : 0);
+    if (gCount > 0 && (!currentCase.galleryImages || currentCase.galleryImages.length === 0)) {
+      fetch(`/api/cases/${encodeURIComponent(currentCase.id)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.case && Array.isArray(data.case.galleryImages)) {
+            setLoadedGallery(data.case.galleryImages);
+          }
+        })
+        .catch(() => {});
+    }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentCase]);
 
@@ -146,7 +161,7 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
 
   const galleryImages = [
     { url: currentCase.imageUrl, caption: currentCase.imageAlt || currentCase.title },
-    ...(currentCase.galleryImages || [])
+    ...loadedGallery
   ];
 
   const handlePrevGalleryImage = () => {

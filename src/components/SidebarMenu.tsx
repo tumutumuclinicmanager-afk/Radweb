@@ -20,7 +20,8 @@ import {
   Headphones,
   Copy,
   Check,
-  MessageSquare
+  MessageSquare,
+  TrendingUp
 } from 'lucide-react';
 import { ActiveView, UserProfile } from '../types';
 import { FREE_CXR_LIMIT, FREE_CT_LIMIT } from '../services/paymentService';
@@ -147,6 +148,23 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
           </button>
 
           <button
+            onClick={() => { setActiveView('progress'); onClose(); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+              activeView === 'progress'
+                ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold'
+                : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <TrendingUp className="w-5 h-5 text-blue-500" />
+            <div className="flex items-center justify-between flex-1">
+              <span>My Progress</span>
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-bold">
+                {progressPercentage}%
+              </span>
+            </div>
+          </button>
+
+          <button
             onClick={() => { setActiveView('interpretation'); onClose(); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
               activeView === 'interpretation'
@@ -270,13 +288,19 @@ export const SidebarMenu: React.FC<SidebarMenuProps> = ({
         <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-4">
           
           {/* Progress Card */}
-          <div className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-4 border border-slate-200 dark:border-slate-700/80">
+          <div
+            onClick={() => { setActiveView('progress'); onClose(); }}
+            className="bg-slate-50 dark:bg-slate-800/60 rounded-2xl p-4 border border-slate-200 dark:border-slate-700/80 hover:border-blue-400 dark:hover:border-blue-600 cursor-pointer transition-all group"
+            title="Open My Progress Dashboard"
+          >
             <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
-              <span className="flex items-center gap-1.5">
+              <span className="flex items-center gap-1.5 group-hover:text-blue-600 transition-colors">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                 Mastery Progress
               </span>
-              <span>{reviewedCount}/{totalCount} Cases</span>
+              <span className="text-[11px] text-slate-500 group-hover:text-blue-600 transition-colors">
+                {reviewedCount}/{totalCount} Cases →
+              </span>
             </div>
             <div className="w-full bg-slate-200 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
               <div 

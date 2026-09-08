@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Stethoscope, Menu, Moon, Sun, ShieldCheck, Smartphone, User, LogIn } from 'lucide-react';
+import { Stethoscope, Menu, Moon, Sun, ShieldCheck, Smartphone, User, LogIn, TrendingUp } from 'lucide-react';
 import { ActiveView, Modality, UserProfile } from '../types';
 import { SidebarMenu } from './SidebarMenu';
 
@@ -112,9 +112,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300">
+            <button
+              onClick={() => setActiveView('progress')}
+              className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeView === 'progress'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+              title="Open My Progress & CME Mastery Dashboard"
+            >
+              <TrendingUp className={`w-3.5 h-3.5 ${activeView === 'progress' ? 'text-white' : 'text-blue-500'}`} />
               <span>{reviewedCount}/{totalCount} Reviewed</span>
-            </div>
+            </button>
 
             <button
               onClick={() => setDarkMode(!darkMode)}

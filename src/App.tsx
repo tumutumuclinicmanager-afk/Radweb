@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ActiveView, Modality, MedicalCase, UserProfile } from './types';
-import { fetchCases, addCaseToFirestore, deleteCaseFromFirestore, sortCasesDeterministically } from './services/casesService';
+import { fetchCases, addCaseToFirestore, deleteCaseFromFirestore, sortCasesDeterministically, triggerBackgroundFullCasesPrefetch } from './services/casesService';
+import { getCasesFromIndexedDB, saveCasesToIndexedDB } from './services/caseDb';
 import { getIsPremiumStatus, markUserAsPremium, clearPremiumStatus } from './services/paymentService';
 import { subscribeToAuth, updateUserPremiumStatusInFirestore } from './services/authService';
 import { Navbar } from './components/Navbar';
@@ -11,6 +12,7 @@ import { FlashcardsView } from './components/FlashcardsView';
 import { DisclaimerModal } from './components/DisclaimerModal';
 import { AdminView } from './components/AdminView';
 import { InterpretationView } from './components/InterpretationView';
+import { ProgressDashboard } from './components/ProgressDashboard';
 import { MpesaPaymentModal } from './components/MpesaPaymentModal';
 import { AuthModal } from './components/AuthModal';
 
@@ -103,28 +105,60 @@ export default function App() {
     }
   };
 
+  const [isLoadingCases, setIsLoadingCases] = useState<boolean>(() => cases.length === 0);
+
   const handleRefreshCases = async () => {
     try {
       const fetched = await fetchCases();
       const sorted = sortCasesDeterministically(fetched);
       setCases(sorted);
-      // Explicitly save the results to the initial load cache after successfully fetching cases
-      localStorage.setItem('radmed_all_cases_initial_cache', JSON.stringify(sorted));
+      setIsLoadingCases(false);
+
+      // Persist full authentic cases to high-capacity IndexedDB for instant future startup
+      await saveCasesToIndexedDB(sorted);
+
+      // Save lightweight manifest to localStorage for emergency fallback
+      try {
+        const lightweight = sorted.map(c => {
+          const { galleryImages, ...rest } = c;
+          return {
+            ...rest,
+            galleryCount: c.galleryCount || (Array.isArray(galleryImages) ? galleryImages.length : 0),
+          };
+        });
+        localStorage.setItem('radmed_all_cases_initial_cache', JSON.stringify(lightweight));
+      } catch {}
+
+      // Asynchronously prefetch complete gallery stacks in the background
+      triggerBackgroundFullCasesPrefetch((fullCases) => {
+        setCases(sortCasesDeterministically(fullCases));
+      });
     } catch (err) {
       console.warn("Failed to retrieve cases on startup:", err);
-      // Display content immediately using the initial load cache if network/API fails
+      // Display content immediately using IndexedDB if network fails
       try {
-        const cached = localStorage.getItem('radmed_all_cases_initial_cache');
-        if (cached) {
-          setCases(sortCasesDeterministically(JSON.parse(cached)));
+        const idbCached = await getCasesFromIndexedDB();
+        if (idbCached && idbCached.length > 0) {
+          setCases(sortCasesDeterministically(idbCached));
         }
       } catch (cacheErr) {
-         console.error("Local storage initialization cache load failed:", cacheErr);
+        console.error("IndexedDB fallback load error:", cacheErr);
+      } finally {
+        setIsLoadingCases(false);
       }
     }
   };
 
   useEffect(() => {
+    // 1. Immediate sub-15ms local cache read from IndexedDB for zero perceived wait time
+    getCasesFromIndexedDB().then((cached) => {
+      if (cached && cached.length > 0) {
+        setCases(sortCasesDeterministically(cached));
+        setIsLoadingCases(false);
+      }
+    }).catch(() => {});
+
+    // 2. Perform fast background synchronization with backend API / Firestore
     handleRefreshCases();
   }, []);
 
@@ -165,6 +199,18 @@ export default function App() {
     if (!reviewedCases.includes(id)) {
       setReviewedCases([...reviewedCases, id]);
     }
+  };
+
+  const handleToggleReviewed = (id: string) => {
+    if (reviewedCases.includes(id)) {
+      setReviewedCases(reviewedCases.filter((item) => item !== id));
+    } else {
+      setReviewedCases([...reviewedCases, id]);
+    }
+  };
+
+  const handleResetProgress = () => {
+    setReviewedCases([]);
   };
 
   const handleAddCase = async (newCase: MedicalCase) => {
@@ -231,6 +277,7 @@ export default function App() {
                 reviewedCases={reviewedCases}
                 isPremium={isPremium}
                 onOpenPaymentModal={handleOpenPaymentModal}
+                isLoadingCases={isLoadingCases}
               />
             )}
 
@@ -277,6 +324,21 @@ export default function App() {
               <InterpretationView
                 onBackToCarousel={() => setActiveView('cases')}
                 onBackToHome={() => setActiveView('home')}
+              />
+            )}
+
+            {activeView === 'progress' && (
+              <ProgressDashboard
+                cases={cases}
+                reviewedCases={reviewedCases}
+                onSelectCase={(c) => setSelectedCaseForDetail(c)}
+                onMarkReviewed={handleMarkReviewed}
+                onToggleReviewed={handleToggleReviewed}
+                onResetProgress={handleResetProgress}
+                onBackToHome={() => setActiveView('home')}
+                onOpenPaymentModal={handleOpenPaymentModal}
+                isPremium={isPremium}
+                currentUser={currentUser}
               />
             )}
           </>
