@@ -104,7 +104,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
       setErrorMessage('');
       setStatusMessage('');
       setCheckoutRequestId(null);
-      setCountdown(45);
+      setCountdown(60);
       setAccountCreated(false);
       setAccountError('');
       setLoginError('');
@@ -145,7 +145,12 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
           clearInterval(pollInterval);
           clearInterval(timer);
           setPaymentStatus('failed');
-          setErrorMessage(result.transaction?.resultDesc || 'M-Pesa transaction was cancelled or declined. Please retry.');
+          setErrorMessage(
+            result.transaction?.resultDesc ||
+            (result as any).resultDesc ||
+            (result as any).message ||
+            'M-Pesa transaction was cancelled or declined. Please retry.'
+          );
         }
       }, 2500);
     }
@@ -169,6 +174,12 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
       return;
     }
 
+    const digitsOnly = cleanPhone.replace(/[\-\+\(\)]/g, '');
+    if (digitsOnly.length < 9 || digitsOnly.length > 13) {
+      setErrorMessage('Please enter a valid Safaricom phone number (e.g. 0712345678, 01XXXXXXXX, or +254XXXXXXXXX).');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const res = await initiateMpesaStkPush(cleanPhone, config.premiumPriceKes);
@@ -176,7 +187,7 @@ export const MpesaPaymentModal: React.FC<MpesaPaymentModalProps> = ({
         setCheckoutRequestId(res.checkoutRequestId);
         setPaymentStatus('push_sent');
         setStatusMessage(res.customerMessage || 'STK prompt sent to your phone.');
-        setCountdown(45);
+        setCountdown(60);
       } else {
         setPaymentStatus('failed');
         setErrorMessage(res.error || 'Failed to dispatch M-Pesa prompt. Please try again.');

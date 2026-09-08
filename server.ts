@@ -768,7 +768,39 @@ app.get('/api/admin/n8n-info', (req, res) => {
 // In-memory server-side cases cache to survive Firestore quota limit failures and reduce daily read units
 let serverCasesCache: any[] = [];
 let lastCacheFetchTime = 0;
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes cache TTL
+const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours cache TTL to prevent read quota exhaustion
+
+// In-memory server-side users cache to prevent repetitive collection reads on user logins and admin requests
+let serverUsersCache: any[] = [];
+let lastUsersCacheFetchTime = 0;
+const USERS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes users cache TTL
+
+async function getResilientUsers(): Promise<any[]> {
+  const now = Date.now();
+  if (serverUsersCache.length > 0 && (now - lastUsersCacheFetchTime) < USERS_CACHE_TTL) {
+    return serverUsersCache;
+  }
+  try {
+    const db = getFirestoreDatabase();
+    if (db) {
+      const snap = await getDocs(collection(db, 'users'));
+      const users: any[] = [];
+      snap.forEach((docSnap) => {
+        users.push({ uid: docSnap.id, ...docSnap.data() });
+      });
+      serverUsersCache = users;
+      lastUsersCacheFetchTime = now;
+      return serverUsersCache;
+    }
+  } catch (err) {
+    console.warn('[Resilient System] Users query notice, serving cache:', err);
+  }
+  return serverUsersCache;
+}
+
+function invalidateUsersCache() {
+  lastUsersCacheFetchTime = 0;
+}
 
 // Helper to load or fetch cases with resilient fallback
 async function getResilientCases(): Promise<any[]> {
@@ -1145,14 +1177,13 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(500).json({ success: false, error: 'Database service temporarily unavailable.' });
     }
 
-    const snap = await getDocs(collection(db, 'users'));
+    const users = await getResilientUsers();
     let matchedUser: any = null;
 
-    snap.forEach((docSnap) => {
-      const data = docSnap.data();
-      const uEmail = (data.email || '').toLowerCase().trim();
-      const uUsername = (data.username || '').toLowerCase().trim();
-      const uPhone = (data.phoneNumber || '').trim();
+    users.forEach((uData) => {
+      const uEmail = (uData.email || '').toLowerCase().trim();
+      const uUsername = (uData.username || '').toLowerCase().trim();
+      const uPhone = (uData.phoneNumber || '').trim();
 
       if (
         uEmail === cleanIdentifier ||
@@ -1160,7 +1191,7 @@ app.post('/api/auth/login', async (req, res) => {
         uPhone === cleanIdentifier ||
         (cleanIdentifier.includes('@') && uEmail.startsWith(cleanIdentifier.split('@')[0]))
       ) {
-        matchedUser = { uid: docSnap.id, ...data };
+        matchedUser = uData;
       }
     });
 
@@ -1317,26 +1348,15 @@ app.post('/api/auth/sync', async (req, res) => {
 // ADMIN USER & TESTER MANAGEMENT SERVICES
 // ==========================================
 
-// GET /api/admin/users: List all users from Firestore
+// GET /api/admin/users: List all users from cached resilient users
 app.get('/api/admin/users', checkAdminAuth, async (req, res) => {
   try {
-    const db = getFirestoreDatabase();
-    if (db) {
-      const snap = await getDocs(collection(db, 'users'));
-      const users: any[] = [];
-      snap.forEach((docSnap) => {
-        users.push({
-          uid: docSnap.id,
-          ...docSnap.data(),
-        });
-      });
-      return res.json({
-        success: true,
-        count: users.length,
-        users,
-      });
-    }
-    return res.json({ success: true, count: 0, users: [] });
+    const users = await getResilientUsers();
+    return res.json({
+      success: true,
+      count: users.length,
+      users,
+    });
   } catch (err: any) {
     console.error('Error fetching users in server:', err);
     return res.status(500).json({ success: false, error: err.message });
@@ -1376,6 +1396,7 @@ app.post('/api/admin/users', checkAdminAuth, async (req, res) => {
     const db = getFirestoreDatabase();
     if (db) {
       await setDoc(doc(db, 'users', uid), userDoc);
+      invalidateUsersCache();
     }
 
     return res.json({
@@ -1406,6 +1427,7 @@ app.post('/api/admin/users/:id/tester', checkAdminAuth, async (req, res) => {
         grantedBy: isTester ? (grantedBy || 'Admin') : null,
         unlockedAt: isTester ? new Date().toISOString() : null,
       });
+      invalidateUsersCache();
     }
 
     return res.json({
@@ -1425,6 +1447,7 @@ app.delete('/api/admin/users/:id', checkAdminAuth, async (req, res) => {
     const db = getFirestoreDatabase();
     if (db) {
       await deleteDoc(doc(db, 'users', id));
+      invalidateUsersCache();
     }
     return res.json({
       success: true,
@@ -1964,6 +1987,18 @@ app.post('/api/payment/mpesa/stkpush', async (req, res) => {
 app.get('/api/payment/status/:checkoutRequestId', async (req, res) => {
   const { checkoutRequestId } = req.params;
   let tx = transactionsCache.get(checkoutRequestId);
+
+  // If transaction was not in cache but checkoutRequestId looks like a PalPluss transaction, reconstruct for polling
+  if (!tx && checkoutRequestId) {
+    tx = {
+      id: checkoutRequestId,
+      checkoutRequestId,
+      status: 'PENDING',
+      provider: 'palpluss',
+      createdAt: new Date().toISOString(),
+    };
+    transactionsCache.set(checkoutRequestId, tx);
+  }
 
   // If transaction is in cache and pending with PalPluss, poll PalPluss API live
   const palplussKey = (paymentConfig.palplussApiKey || process.env.PALPLUSS_API_KEY || '').trim();

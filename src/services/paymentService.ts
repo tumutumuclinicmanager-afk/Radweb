@@ -76,22 +76,21 @@ export function savePremiumStatus(receiptNumber?: string, phoneNumber?: string, 
 async function safeJsonParse(res: Response): Promise<{ ok: boolean; status: number; data: any; rawText: string; isHtml404: boolean }> {
   const status = res.status;
   const rawText = await res.text().catch(() => '');
-  const isHtmlOrStatic =
-    status === 404 ||
-    status === 405 ||
-    status === 502 ||
-    status === 503 ||
-    rawText.includes('NOT_FOUND') ||
-    rawText.includes('404') ||
-    rawText.includes('405') ||
-    rawText.includes('Method Not Allowed') ||
-    rawText.includes('<!DOCTYPE') ||
-    rawText.includes('<html');
 
   try {
     const data = JSON.parse(rawText);
-    return { ok: res.ok, status, data, rawText, isHtml404: isHtmlOrStatic && !res.ok };
+    return { ok: res.ok, status, data, rawText, isHtml404: false };
   } catch {
+    // If JSON parsing failed, check if this is an HTML error page or proxy 404/502
+    const isHtmlOrStatic =
+      status === 404 ||
+      status === 405 ||
+      status === 502 ||
+      status === 503 ||
+      rawText.includes('<!DOCTYPE') ||
+      rawText.includes('<html') ||
+      rawText.includes('FUNCTION_INVOCATION_FAILED');
+
     // Clean snippet of HTML or text for user display
     const cleanSnippet = rawText
       .replace(/<[^>]*>?/gm, ' ')
@@ -107,7 +106,7 @@ async function safeJsonParse(res: Response): Promise<{ ok: boolean; status: numb
         error: cleanSnippet ? `Server response (${status}): ${cleanSnippet}` : `Server returned HTTP ${status}`,
       },
       rawText,
-      isHtml404: true,
+      isHtml404: isHtmlOrStatic,
     };
   }
 }
@@ -198,70 +197,47 @@ export async function initiateMpesaStkPush(phoneNumber: string, amount?: number)
   mode?: string;
 }> {
   try {
+    let cleanPhone = (phoneNumber || '').replace(/[\s\-\+\(\)]/g, '');
+    if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.substring(1);
+    else if (cleanPhone.startsWith('7') || cleanPhone.startsWith('1')) cleanPhone = '254' + cleanPhone;
+
     const res = await fetch('/api/payment/mpesa/stkpush', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumber, amount }),
+      body: JSON.stringify({ phoneNumber: cleanPhone, amount }),
     });
     const parsed = await safeJsonParse(res);
+
+    // 1. If backend returned parsed JSON with success
+    if (parsed.data && typeof parsed.data === 'object') {
+      if (parsed.data.success && parsed.data.checkoutRequestId) {
+        return parsed.data;
+      }
+      if (parsed.data.error) {
+        return {
+          success: false,
+          error: parsed.data.error,
+        };
+      }
+    }
 
     if (parsed.ok && parsed.data && typeof parsed.data === 'object') {
       return parsed.data;
     }
 
-    // If server returned 404 (static deployment on Vercel without backend server)
+    // 2. If server returned HTML 404/502 (e.g. backend offline or proxy failure)
     if (parsed.isHtml404) {
-      console.log('[Payment] Static deployment detected, using client-side STK handler');
       const config = await fetchPaymentConfig();
-      const palplussKey = (config.palplussApiKey || 'pp_live_2f9aa2197ab69a9a6915bd538f519a059ffd7e6ca6568b68').trim();
       const payable = amount || config.premiumPriceKes || 1000;
-      let cleanedPhone = (phoneNumber || '').replace(/[\s\-\+\(\)]/g, '');
-      if (cleanedPhone.startsWith('0')) cleanedPhone = '254' + cleanedPhone.substring(1);
-      if (cleanedPhone.startsWith('7') || cleanedPhone.startsWith('1')) cleanedPhone = '254' + cleanedPhone;
-
-      try {
-        const clientDirectResp = await fetch('https://api.palpluss.com/v1/payments/stk', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: formatPalPlussBasicAuth(palplussKey),
-          },
-          body: JSON.stringify({
-            amount: payable,
-            phone: cleanedPhone,
-            accountReference: 'RadMed Pro',
-            transactionDesc: 'RadMed Pro',
-          }),
-        });
-
-        const clientData = await clientDirectResp.json().catch(() => null);
-        if (clientDirectResp.ok && clientData && clientData.success !== false) {
-          const liveTxId = clientData.data?.transactionId || clientData.transactionId || `PAL_${Date.now()}`;
-          return {
-            success: true,
-            checkoutRequestId: liveTxId,
-            customerMessage: `STK push prompt sent to ${cleanedPhone}. Please enter your M-Pesa PIN on your phone to complete your payment of KES ${payable}.`,
-            mode: 'palpluss_direct_client',
-          };
-        }
-      } catch (corsErr) {
-        console.warn('PalPluss direct client call CORS notice:', corsErr);
-      }
-
-      // If direct call cannot execute due to browser CORS, provide manual fallback
       return {
         success: false,
-        error: `Please pay KES ${payable} via M-Pesa to Till / Buy Goods ${config.paybillOrTillNumber || '1661655'} (or Account: RadMed), then enter the M-Pesa confirmation code below to unlock instantly.`,
+        error: `Unable to connect to automated M-Pesa server (${parsed.status}). Please pay KES ${payable} via M-Pesa to Till / Buy Goods ${config.paybillOrTillNumber || '1661655'} (or Account: RadMed), then enter the M-Pesa confirmation code below to unlock instantly.`,
       };
-    }
-
-    if (parsed.data && typeof parsed.data === 'object' && parsed.data.error) {
-      return parsed.data;
     }
 
     return {
       success: false,
-      error: parsed.data?.error || `Payment server returned status ${parsed.status}.`,
+      error: parsed.data?.error || `Payment server returned HTTP ${parsed.status}.`,
     };
   } catch (err: any) {
     return { success: false, error: err.message || 'Network error initiating STK push' };

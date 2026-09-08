@@ -1,5 +1,4 @@
 import express from 'express';
-import { DEFAULT_BASELINE_CASES } from '../src/services/baselineCases';
 
 const app = express();
 app.use(express.json());
@@ -20,9 +19,14 @@ let paymentConfig = {
 };
 
 function getPalPlussAuthHeader(apiKey: string): string {
-  const key = apiKey.trim();
-  if (key.startsWith('Basic ')) return key;
-  return `Basic ${Buffer.from(`${key}:`).toString('base64')}`;
+  const trimmed = (apiKey || '').trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('Basic ')) return trimmed;
+  if (trimmed.startsWith('cHBfbGl2ZV8') || (trimmed.length > 40 && /^[A-Za-z0-9+/=]+$/.test(trimmed))) {
+    const rawNoColon = trimmed.endsWith(':') ? trimmed.slice(0, -1) : trimmed;
+    return `Basic ${rawNoColon}`;
+  }
+  return 'Basic ' + Buffer.from(trimmed).toString('base64');
 }
 
 // GET /api/payment/config
@@ -270,7 +274,7 @@ app.post('/api/admin/payment/palpluss/test', async (req, res) => {
 });
 
 // In-memory case storage fallback for serverless
-let serverlessCasesCache: any[] = [...DEFAULT_BASELINE_CASES];
+let serverlessCasesCache: any[] = [];
 
 // GET /api/cases
 app.get('/api/cases', (req, res) => {
