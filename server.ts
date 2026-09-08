@@ -574,6 +574,14 @@ Ensure realistic clinical diversity. Emphasize key diagnostic terms in bold mark
 // NORMALIZER & AUTH FOR N8N & AUTOMATION ADMIN WRITE API
 // -------------------------------------------------------------
 
+// n8n Autonomous AI Agent Autopilot State (Switched OFF by default for now)
+let n8nAgentState = {
+  enabled: process.env.ENABLE_N8N_AGENT === 'true', // Defaults to false
+  status: (process.env.ENABLE_N8N_AGENT === 'true' ? 'online' : 'switched_off') as 'online' | 'switched_off' | 'paused',
+  pausedReason: 'Switched off by administrator for now',
+  updatedAt: new Date().toISOString(),
+};
+
 function normalizeMedicalCase(raw: any) {
   const modality: 'chest_xray' | 'head_ct' =
     raw.modality === 'head_ct' || raw.modality === 'ct' || raw.modality === 'head' ? 'head_ct' : 'chest_xray';
@@ -696,6 +704,38 @@ function checkAdminAuth(req: express.Request, res: express.Response, next: expre
   next();
 }
 
+// GET /api/admin/n8n/status: Get current n8n AI agent state
+app.get('/api/admin/n8n/status', (req, res) => {
+  res.json({
+    success: true,
+    enabled: n8nAgentState.enabled,
+    status: n8nAgentState.status,
+    pausedReason: n8nAgentState.pausedReason,
+    updatedAt: n8nAgentState.updatedAt,
+  });
+});
+
+// POST /api/admin/n8n/toggle: Switch n8n AI agent on or off
+app.post('/api/admin/n8n/toggle', checkAdminAuth, (req, res) => {
+  const { enabled } = req.body;
+  const newEnabled = typeof enabled === 'boolean' ? enabled : !n8nAgentState.enabled;
+  n8nAgentState = {
+    enabled: newEnabled,
+    status: newEnabled ? 'online' : 'switched_off',
+    pausedReason: newEnabled ? '' : 'Switched off by administrator for now',
+    updatedAt: new Date().toISOString(),
+  };
+
+  return res.json({
+    success: true,
+    enabled: n8nAgentState.enabled,
+    status: n8nAgentState.status,
+    pausedReason: n8nAgentState.pausedReason,
+    message: newEnabled ? 'n8n AI agent autopilot switched ON.' : 'n8n AI agent autopilot switched OFF.',
+    updatedAt: n8nAgentState.updatedAt,
+  });
+});
+
 // GET /api/admin/n8n-info: Documentation, schemas, and endpoints for external agents
 app.get('/api/admin/n8n-info', (req, res) => {
   const host = req.get('host') || 'localhost:3000';
@@ -704,7 +744,9 @@ app.get('/api/admin/n8n-info', (req, res) => {
 
   res.json({
     name: 'RadMed Admin API & n8n Autonomous Agent Hub',
-    status: 'online',
+    status: n8nAgentState.enabled ? 'online' : 'switched_off',
+    agentEnabled: n8nAgentState.enabled,
+    pausedReason: n8nAgentState.pausedReason,
     version: '1.0.0',
     endpoints: {
       postSingleCase: {
@@ -1008,6 +1050,16 @@ app.post('/api/admin/cases/batch', checkAdminAuth, async (req, res) => {
 // POST /api/admin/cases/curate-and-publish: Autonomous AI Curation & Direct Publishing for n8n
 app.post('/api/admin/cases/curate-and-publish', checkAdminAuth, async (req, res) => {
   try {
+    if (!n8nAgentState.enabled) {
+      return res.status(403).json({
+        success: false,
+        error: 'n8n AI Agent Autopilot is currently switched off.',
+        agentStatus: n8nAgentState.status,
+        pausedReason: n8nAgentState.pausedReason,
+        hint: 'The administrator has switched off the n8n AI agent for now. Turn it on in the Admin Console or set ENABLE_N8N_AGENT=true to re-enable automated curation.',
+      });
+    }
+
     const { 
       prompt = '', 
       modality = 'chest_xray', 

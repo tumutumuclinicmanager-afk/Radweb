@@ -273,6 +273,46 @@ app.post('/api/admin/payment/palpluss/test', async (req, res) => {
   });
 });
 
+// n8n Autonomous AI Agent State (Switched OFF for now)
+let n8nServerlessAgentState = {
+  enabled: process.env.ENABLE_N8N_AGENT === 'true',
+  status: (process.env.ENABLE_N8N_AGENT === 'true' ? 'online' : 'switched_off') as 'online' | 'switched_off' | 'paused',
+  pausedReason: 'Switched off by administrator for now',
+  updatedAt: new Date().toISOString(),
+};
+
+// GET /api/admin/n8n/status
+app.get('/api/admin/n8n/status', (req, res) => {
+  res.json({
+    success: true,
+    enabled: n8nServerlessAgentState.enabled,
+    status: n8nServerlessAgentState.status,
+    pausedReason: n8nServerlessAgentState.pausedReason,
+    updatedAt: n8nServerlessAgentState.updatedAt,
+  });
+});
+
+// POST /api/admin/n8n/toggle
+app.post('/api/admin/n8n/toggle', (req, res) => {
+  const { enabled } = req.body || {};
+  const newEnabled = typeof enabled === 'boolean' ? enabled : !n8nServerlessAgentState.enabled;
+  n8nServerlessAgentState = {
+    enabled: newEnabled,
+    status: newEnabled ? 'online' : 'switched_off',
+    pausedReason: newEnabled ? '' : 'Switched off by administrator for now',
+    updatedAt: new Date().toISOString(),
+  };
+
+  res.json({
+    success: true,
+    enabled: n8nServerlessAgentState.enabled,
+    status: n8nServerlessAgentState.status,
+    pausedReason: n8nServerlessAgentState.pausedReason,
+    message: newEnabled ? 'n8n AI agent autopilot switched ON.' : 'n8n AI agent autopilot switched OFF.',
+    updatedAt: n8nServerlessAgentState.updatedAt,
+  });
+});
+
 // In-memory case storage fallback for serverless
 let serverlessCasesCache: any[] = [];
 

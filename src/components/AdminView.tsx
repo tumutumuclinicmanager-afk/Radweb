@@ -41,7 +41,9 @@ import {
   Stethoscope,
   Activity,
   Wifi,
-  Users
+  Users,
+  Power,
+  PowerOff
 } from 'lucide-react';
 import { researchCaseWithAI, batchResearchCasesWithAI } from '../services/aiAgentService';
 import { fetchPaymentConfig, testPalPlussApi, updatePaymentConfig } from '../services/paymentService';
@@ -125,6 +127,11 @@ export const AdminView: React.FC<AdminViewProps> = ({
   }, []);
 
   // --- AUTOMATION / N8N STATE ---
+  const [n8nAgentEnabled, setN8nAgentEnabled] = useState<boolean>(false);
+  const [n8nAgentStatus, setN8nAgentStatus] = useState<'online' | 'switched_off' | 'paused'>('switched_off');
+  const [n8nStatusLoading, setN8nStatusLoading] = useState<boolean>(false);
+  const [n8nStatusMessage, setN8nStatusMessage] = useState<string>('n8n AI Agent Autopilot is currently switched off.');
+
   const [apiSecretKey] = useState<string>('radmed_admin_secret_key_2026');
   const [showSecret, setShowSecret] = useState<boolean>(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -572,6 +579,51 @@ export const AdminView: React.FC<AdminViewProps> = ({
   ];
 
   // Automation / n8n helpers
+  useEffect(() => {
+    fetch('/api/admin/n8n/status')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success) {
+          setN8nAgentEnabled(!!data.enabled);
+          setN8nAgentStatus(data.status || (data.enabled ? 'online' : 'switched_off'));
+          if (!data.enabled) {
+            setN8nStatusMessage(data.pausedReason || 'n8n AI Agent Autopilot is currently switched off.');
+          } else {
+            setN8nStatusMessage('n8n AI Agent Autopilot is active and ready.');
+          }
+        }
+      })
+      .catch(() => {
+        setN8nAgentEnabled(false);
+        setN8nAgentStatus('switched_off');
+        setN8nStatusMessage('n8n AI Agent Autopilot is currently switched off.');
+      });
+  }, []);
+
+  const handleToggleN8nAgent = async () => {
+    setN8nStatusLoading(true);
+    try {
+      const res = await fetch('/api/admin/n8n/toggle', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiSecretKey}`,
+        },
+        body: JSON.stringify({ enabled: !n8nAgentEnabled }),
+      });
+      const data = await res.json();
+      if (data && data.success) {
+        setN8nAgentEnabled(!!data.enabled);
+        setN8nAgentStatus(data.status);
+        setN8nStatusMessage(data.message || (data.enabled ? 'n8n AI agent switched ON.' : 'n8n AI agent switched OFF.'));
+      }
+    } catch (err: any) {
+      console.error('Error toggling n8n agent:', err);
+    } finally {
+      setN8nStatusLoading(false);
+    }
+  };
+
   const handleCopy = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldId);
@@ -893,7 +945,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
         >
-          <Cpu className="w-4 h-4" /> API & n8n Automation
+          <Cpu className="w-4 h-4" />
+          <span>API & n8n Automation</span>
+          {!n8nAgentEnabled && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30">
+              OFF
+            </span>
+          )}
         </button>
         <button
           onClick={() => setActiveTab('payment')}
@@ -1963,9 +2021,19 @@ export const AdminView: React.FC<AdminViewProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-700/60 text-emerald-400 text-xs font-semibold">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                      API Online • Firestore Write Enabled
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950/80 border border-slate-700 text-slate-300 text-xs font-semibold">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        API Online
+                      </div>
+                      <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold ${
+                        n8nAgentEnabled 
+                          ? 'bg-emerald-950/80 border border-emerald-700/60 text-emerald-400' 
+                          : 'bg-amber-950/80 border border-amber-700/60 text-amber-400'
+                      }`}>
+                        <span className={`w-2 h-2 rounded-full ${n8nAgentEnabled ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                        {n8nAgentEnabled ? 'n8n Autopilot: Active' : 'n8n Agent: Switched OFF'}
+                      </div>
                     </div>
                   </div>
 
@@ -2020,6 +2088,66 @@ export const AdminView: React.FC<AdminViewProps> = ({
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Dedicated n8n AI Agent Autopilot Control Card */}
+              <div className={`rounded-3xl p-6 shadow-xl border transition-all ${
+                n8nAgentEnabled 
+                  ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/80' 
+                  : 'bg-amber-50/80 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/80'
+              }`}>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                      n8nAgentEnabled 
+                        ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' 
+                        : 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                    }`}>
+                      {n8nAgentEnabled ? <Power className="w-6 h-6" /> : <PowerOff className="w-6 h-6" />}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                          n8n Autonomous AI Agent Autopilot
+                        </h3>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                          n8nAgentEnabled 
+                            ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700' 
+                            : 'bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700'
+                        }`}>
+                          {n8nAgentEnabled ? 'ACTIVE / ONLINE' : 'SWITCHED OFF (PAUSED)'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                        {n8nAgentEnabled 
+                          ? 'Automated curation and direct publishing via n8n workflows is currently active.' 
+                          : 'The autonomous n8n AI agent is currently switched off for now. Inbound curation requests to /api/admin/cases/curate-and-publish will be paused (HTTP 403).'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleToggleN8nAgent}
+                    disabled={n8nStatusLoading}
+                    className={`px-5 py-2.5 rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer ${
+                      n8nAgentEnabled
+                        ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    } disabled:opacity-50`}
+                  >
+                    {n8nStatusLoading ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : n8nAgentEnabled ? (
+                      <>
+                        <PowerOff className="w-4 h-4" /> Switch OFF Agent
+                      </>
+                    ) : (
+                      <>
+                        <Power className="w-4 h-4" /> Switch ON Agent
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
 
@@ -2105,6 +2233,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 {/* Form or JSON editor based on selected test endpoint */}
                 {testEndpoint === 'curate' ? (
                   <div className="space-y-4">
+                    {!n8nAgentEnabled && (
+                      <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 flex items-start gap-3">
+                        <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <div className="text-xs text-amber-800 dark:text-amber-300">
+                          <span className="font-bold">n8n AI Agent is switched off:</span> Testing this Autopilot endpoint will return a <code className="px-1 py-0.5 bg-amber-100 dark:bg-amber-900 rounded font-mono text-[11px]">403 Forbidden</code> response confirming that automated curation is disabled. Turn the agent ON above if you want to execute live case curation.
+                        </div>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">
                         Clinical Topic / Case Concept
