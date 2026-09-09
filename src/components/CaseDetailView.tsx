@@ -930,17 +930,17 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
 
       {/* Lightbox / Zoom Modal for Finer Details */}
       {lightboxOpen && !isLocked && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4 overflow-auto">
-          <div className="relative w-full max-w-5xl flex flex-col items-center justify-center min-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-3 sm:p-6 overflow-auto">
+          <div className="relative w-full max-w-5xl flex flex-col items-center justify-center min-h-[90vh] my-auto">
             
             {/* Top Lightbox Controls Bar */}
-            <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10 bg-slate-900/80 backdrop-blur-md px-6 py-3 rounded-2xl border border-slate-800 text-white">
-              <div className="flex items-center gap-3">
-                <Maximize2 className="w-5 h-5 text-blue-400" />
+            <div className="w-full mb-3 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/90 backdrop-blur-md px-4 sm:px-6 py-3 rounded-2xl border border-slate-800 text-white z-10 shadow-lg">
+              <div className="flex items-center gap-2.5 text-center sm:text-left">
+                <Maximize2 className="w-5 h-5 text-blue-400 shrink-0" />
                 <span className="text-xs font-semibold text-slate-300">High-Resolution Radiograph / CT Zoom Viewer (Zoom: {Math.round(zoomLevel * 100)}%)</span>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap justify-center">
                 <button
                   onClick={() => setZoomLevel((prev) => Math.max(1, prev - 0.5))}
                   className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold transition-colors"
@@ -966,7 +966,7 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
                 </button>
                 <button
                   onClick={() => setLightboxOpen(false)}
-                  className="p-2 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white transition-colors ml-4"
+                  className="p-2 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white transition-colors ml-2"
                   title="Close Zoom Viewer"
                 >
                   <X className="w-5 h-5" />
@@ -984,7 +984,7 @@ export const CaseDetailView: React.FC<CaseDetailViewProps> = ({
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              className="relative overflow-hidden max-h-[75vh] max-w-full rounded-2xl border border-slate-800 bg-slate-950 p-2 mt-16 flex items-center justify-center select-none group cursor-grab active:cursor-grabbing"
+              className="relative overflow-hidden max-h-[70vh] max-w-full rounded-2xl border border-slate-800 bg-slate-950 p-2 flex items-center justify-center select-none group cursor-grab active:cursor-grabbing w-full shadow-2xl"
             >
               <img
                 src={getSafeImageUrl(selectedImgUrl, 1600, 90)}
