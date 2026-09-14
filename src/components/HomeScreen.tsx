@@ -31,6 +31,7 @@ import { isCaseLocked, FREE_CXR_LIMIT, FREE_CT_LIMIT } from '../services/payment
 import { sortCasesDeterministically } from '../services/casesService';
 import { getSafeImageUrl, handleImageError } from '../lib/imageUtils';
 import { FormattedText } from './FormattedText';
+import { BrainMap } from './BrainMap';
 
 interface HomeScreenProps {
   setActiveView: (view: ActiveView) => void;
@@ -443,6 +444,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               })
             )}
           </div>
+        </div>
+
+        {/* --- 3D BRAIN MAP (NEUROANATOMY & CT CORRELATION) --- */}
+        <div className="pt-2">
+          <BrainMap
+            cases={cases}
+            onSelectCase={onSelectCase}
+            onExploreHeadCt={() => {
+              setSelectedModality('head_ct');
+              setActiveView('cases');
+            }}
+          />
         </div>
 
         {/* --- SECTION 2: HEAD CT CASES --- */}
