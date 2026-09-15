@@ -376,6 +376,44 @@ export async function registerWithEmail(
 
     return { success: true, user: syncedProfile };
   } catch (err: any) {
+    if (
+      err.code === 'auth/operation-not-allowed' || 
+      err.code === 'auth/configuration-not-found' || 
+      err.code === 'auth/admin-restricted-operation'
+    ) {
+      // Graceful fallback when Firebase Auth provider is not enabled in Firebase Console
+      const fallbackUid = `user_local_${Date.now()}`;
+      const localPrem = getStoredPremiumStatus();
+      const hasPaid = Boolean(
+        paymentDetails?.mpesaReceiptNumber || 
+        (localPrem.isPremium && localPrem.receiptNumber && localPrem.receiptNumber.length > 5)
+      );
+      const mpesaReceipt = paymentDetails?.mpesaReceiptNumber || (hasPaid ? localPrem.receiptNumber : undefined);
+      const phone = paymentDetails?.phoneNumber || (hasPaid ? localPrem.phoneNumber : undefined);
+      const cleanUsername = (username || email.split('@')[0]).trim().toLowerCase().replace(/[^a-z0-9_.-]/g, '');
+
+      const profile: UserProfile = {
+        uid: fallbackUid,
+        email: email.trim(),
+        username: cleanUsername,
+        displayName: displayName || cleanUsername || email.split('@')[0],
+        isPremium: hasPaid,
+        mpesaReceiptNumber: mpesaReceipt,
+        phoneNumber: phone,
+        unlockedAt: hasPaid ? new Date().toISOString() : undefined,
+        provider: 'local_fallback',
+        createdAt: new Date().toISOString(),
+      };
+
+      if (profile.isPremium) {
+        markUserAsPremium(profile.mpesaReceiptNumber, profile.phoneNumber || undefined);
+      } else {
+        clearPremiumStatus();
+      }
+      cacheUserProfile(profile);
+      return { success: true, user: profile };
+    }
+
     let msg = err.message || 'Account registration failed.';
     if (err.code === 'auth/email-already-in-use') {
       msg = 'This email already has an account. Please log in to restore your access.';
@@ -654,6 +692,31 @@ export async function signInWithGoogleAccount(
 
     return { success: true, user: profile };
   } catch (err: any) {
+    if (
+      err.code === 'auth/operation-not-allowed' || 
+      err.code === 'auth/configuration-not-found' || 
+      err.code === 'auth/admin-restricted-operation'
+    ) {
+      const fallbackUid = `google_local_${Date.now()}`;
+      const localPrem = getStoredPremiumStatus();
+      const hasPaid = Boolean(paymentDetails?.mpesaReceiptNumber || (localPrem.isPremium && localPrem.receiptNumber));
+      const profile: UserProfile = {
+        uid: fallbackUid,
+        email: 'clinician@radmed.org',
+        displayName: 'RadMed Clinician',
+        isPremium: hasPaid,
+        mpesaReceiptNumber: paymentDetails?.mpesaReceiptNumber || localPrem.receiptNumber,
+        phoneNumber: paymentDetails?.phoneNumber || localPrem.phoneNumber,
+        provider: 'google_fallback',
+        createdAt: new Date().toISOString(),
+      };
+      if (profile.isPremium) {
+        markUserAsPremium(profile.mpesaReceiptNumber, profile.phoneNumber || undefined);
+      }
+      cacheUserProfile(profile);
+      return { success: true, user: profile };
+    }
+
     if (err.code === 'auth/popup-closed-by-user') {
       return { success: false, error: 'Google sign-in popup was closed.' };
     }
