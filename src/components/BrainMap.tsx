@@ -24,7 +24,8 @@ import {
   HeartPulse,
   GitBranch,
   Split,
-  EyeOff
+  EyeOff,
+  Search
 } from 'lucide-react';
 import { MedicalCase } from '../types';
 
@@ -368,6 +369,8 @@ export const BrainMap: React.FC<BrainMapProps> = ({
   const [slicePosition, setSlicePosition] = useState<number>(0.2);
   const [sliceAxis, setSliceAxis] = useState<'axial' | 'coronal' | 'sagittal'>('axial');
   const [zoomScale, setZoomScale] = useState<number>(1);
+  const [cortexOpacity, setCortexOpacity] = useState<number>(1.0);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   // Floating callout showing the name of the clicked area
   const [clickCallout, setClickCallout] = useState<{
@@ -387,9 +390,16 @@ export const BrainMap: React.FC<BrainMapProps> = ({
   }, [selectedRegionId]);
 
   const filteredRegions = useMemo(() => {
-    if (activeCategory === 'all') return BRAIN_REGIONS;
-    return BRAIN_REGIONS.filter(r => r.category === activeCategory);
-  }, [activeCategory]);
+    let list = BRAIN_REGIONS;
+    if (activeCategory !== 'all') {
+      list = list.filter(r => r.category === activeCategory);
+    }
+    if (searchTerm.trim() !== '') {
+      const q = searchTerm.toLowerCase();
+      list = list.filter(r => r.name.toLowerCase().includes(q) || r.latinName.toLowerCase().includes(q) || r.function.toLowerCase().includes(q));
+    }
+    return list;
+  }, [activeCategory, searchTerm]);
 
   // Match head CT cases associated with current region
   const relatedCases = useMemo(() => {
@@ -569,19 +579,18 @@ export const BrainMap: React.FC<BrainMapProps> = ({
         // Crevices (negative displacement) are shaded dark maroon/brown; crests are soft warm cortical cream/pink
         const sulcusShadow = Math.max(0, Math.min(1, (totalDisplacement + 0.20) / 0.36));
         
-        // Base cortical flesh palette:
-        // Sulcus crevice: rgb(0.32, 0.14, 0.18) - deep biological venous shadow
-        // Mid-bank: rgb(0.80, 0.54, 0.56) - warm vascular parenchyma
-        // Gyral crest: rgb(0.95, 0.79, 0.74) - living grey-matter cortex crown
+        // Base cortical flesh palette matching professional anatomical 3D rendering:
+        // Sulcus crevice: warm brownish-tan shadow
+        // Gyral crest: warm ivory / sand / beige cortex crown
         const cr = sulcusShadow < 0.45 
-          ? THREE.MathUtils.lerp(0.30, 0.80, sulcusShadow / 0.45) 
-          : THREE.MathUtils.lerp(0.80, 0.95, (sulcusShadow - 0.45) / 0.55);
+          ? THREE.MathUtils.lerp(0.50, 0.78, sulcusShadow / 0.45) 
+          : THREE.MathUtils.lerp(0.78, 0.94, (sulcusShadow - 0.45) / 0.55);
         const cg = sulcusShadow < 0.45 
-          ? THREE.MathUtils.lerp(0.12, 0.54, sulcusShadow / 0.45) 
-          : THREE.MathUtils.lerp(0.54, 0.79, (sulcusShadow - 0.45) / 0.55);
+          ? THREE.MathUtils.lerp(0.40, 0.70, sulcusShadow / 0.45) 
+          : THREE.MathUtils.lerp(0.70, 0.88, (sulcusShadow - 0.45) / 0.55);
         const cb = sulcusShadow < 0.45 
-          ? THREE.MathUtils.lerp(0.15, 0.56, sulcusShadow / 0.45) 
-          : THREE.MathUtils.lerp(0.56, 0.74, (sulcusShadow - 0.45) / 0.55);
+          ? THREE.MathUtils.lerp(0.32, 0.62, sulcusShadow / 0.45) 
+          : THREE.MathUtils.lerp(0.62, 0.80, (sulcusShadow - 0.45) / 0.55);
 
         colors[i * 3] = cr;
         colors[i * 3 + 1] = cg;
@@ -898,16 +907,18 @@ export const BrainMap: React.FC<BrainMapProps> = ({
     leftHemGeoRef.current = leftHemGeo;
     rightHemGeoRef.current = rightHemGeo;
     
-    // Lifelike Biological Cortical Material with Pia-Arachnoid CSF Sheen
+    // Lifelike Biological Cortical Material with Pia-Arachnoid Wet CSF Sheen
     const corticalMaterial = new THREE.MeshPhysicalMaterial({
       vertexColors: true,
-      roughness: 0.36,
-      metalness: 0.04,
-      clearcoat: 0.38,
-      clearcoatRoughness: 0.18,
-      sheen: 0.65,
-      sheenColor: new THREE.Color(0xffccd5),
-      reflectivity: 0.52,
+      roughness: 0.28,
+      metalness: 0.05,
+      clearcoat: 0.82,
+      clearcoatRoughness: 0.06,
+      transmission: 0.08,
+      thickness: 0.5,
+      sheen: 0.85,
+      sheenColor: new THREE.Color(0xfef3c7),
+      reflectivity: 0.65,
     });
 
     const leftCerebrum = new THREE.Mesh(leftHemGeo, corticalMaterial.clone());
@@ -1425,46 +1436,36 @@ export const BrainMap: React.FC<BrainMapProps> = ({
     // 1. Dynamic Per-Vertex Cortical Lobar Highlight
     applyCorticalHighlight(selectedRegion);
 
-    // 2. Translucent Reveal for Deep / Fluid / Vascular Structures
+    // 2. Translucent Reveal for Deep / Fluid / Vascular Structures or Cortical Peel Slider
     const isInternalStructure = selectedRegion.category === 'deep' || 
                                 selectedRegion.category === 'fluid' || 
                                 selectedRegion.category === 'vascular';
 
+    const effectiveOpacity = cortexOpacity < 1.0 ? cortexOpacity : (isInternalStructure && renderMode === 'photoreal' ? 0.28 : 1.0);
+    const isTranslucent = effectiveOpacity < 1.0;
+
     if (renderMode === 'photoreal') {
-      if (isInternalStructure) {
-        // Semi-transparent cortical window allowing direct inspection of deep internal structures
-        const revealMat = new THREE.MeshPhysicalMaterial({
-          color: 0xecfdf5,
-          transparent: true,
-          opacity: 0.28,
-          transmission: 0.84,
-          roughness: 0.16,
-          depthWrite: false,
-        });
-        leftCerebrum.material = revealMat;
-        rightCerebrum.material = revealMat.clone();
-        if (leftCereb && rightCereb) {
-          leftCereb.material = revealMat.clone();
-          rightCereb.material = revealMat.clone();
-        }
-      } else {
-        // Natural Organic Brain Cortex with Deep Sulci Vertex Shadows & Pia Mater CSF Sheen
-        const photorealMat = new THREE.MeshPhysicalMaterial({
-          vertexColors: true,
-          roughness: 0.36,
-          metalness: 0.04,
-          clearcoat: 0.38,
-          clearcoatRoughness: 0.18,
-          sheen: 0.65,
-          sheenColor: new THREE.Color(0xffccd5),
-          reflectivity: 0.52,
-        });
-        leftCerebrum.material = photorealMat;
-        rightCerebrum.material = photorealMat.clone();
-        if (leftCereb && rightCereb) {
-          leftCereb.material = photorealMat.clone();
-          rightCereb.material = photorealMat.clone();
-        }
+      // Natural Organic Brain Cortex with Deep Sulci Vertex Shadows & Pia Mater CSF Sheen
+      const photorealMat = new THREE.MeshPhysicalMaterial({
+        vertexColors: true,
+        roughness: 0.28,
+        metalness: 0.05,
+        clearcoat: 0.82,
+        clearcoatRoughness: 0.06,
+        transmission: isTranslucent ? 0.85 : 0.08,
+        thickness: 0.5,
+        sheen: 0.85,
+        sheenColor: new THREE.Color(0xfef3c7),
+        reflectivity: 0.65,
+        transparent: isTranslucent,
+        opacity: effectiveOpacity,
+        depthWrite: !isTranslucent,
+      });
+      leftCerebrum.material = photorealMat;
+      rightCerebrum.material = photorealMat.clone();
+      if (leftCereb && rightCereb) {
+        leftCereb.material = photorealMat.clone();
+        rightCereb.material = photorealMat.clone();
       }
     } else if (renderMode === 'anatomic') {
       // Functional Lobar Highlighting with active color
@@ -1475,12 +1476,15 @@ export const BrainMap: React.FC<BrainMapProps> = ({
         metalness: 0.15,
         emissive: activeColor,
         emissiveIntensity: 0.18,
+        transparent: isTranslucent,
+        opacity: effectiveOpacity,
+        depthWrite: !isTranslucent,
       });
       leftCerebrum.material = anatomicMat;
       rightCerebrum.material = anatomicMat.clone();
       if (leftCereb && rightCereb) {
         const cerebColor = selectedRegionId === 'cerebellum' ? new THREE.Color('#ec4899') : new THREE.Color('#f472b6');
-        const cerebMat = new THREE.MeshStandardMaterial({ color: cerebColor, roughness: 0.45 });
+        const cerebMat = new THREE.MeshStandardMaterial({ color: cerebColor, roughness: 0.45, transparent: isTranslucent, opacity: effectiveOpacity });
         leftCereb.material = cerebMat;
         rightCereb.material = cerebMat.clone();
       }
@@ -1490,6 +1494,8 @@ export const BrainMap: React.FC<BrainMapProps> = ({
         color: 0x94a3b8,
         roughness: 0.65,
         metalness: 0.05,
+        transparent: isTranslucent,
+        opacity: effectiveOpacity,
       });
       leftCerebrum.material = ctMat;
       rightCerebrum.material = ctMat.clone();
@@ -1503,6 +1509,8 @@ export const BrainMap: React.FC<BrainMapProps> = ({
         color: 0x38bdf8,
         wireframe: true,
         roughness: 0.2,
+        transparent: isTranslucent,
+        opacity: effectiveOpacity,
       });
       leftCerebrum.material = wireMat;
       rightCerebrum.material = wireMat.clone();
@@ -1515,7 +1523,7 @@ export const BrainMap: React.FC<BrainMapProps> = ({
       const transMat = new THREE.MeshPhysicalMaterial({
         color: 0xe0f2fe,
         transparent: true,
-        opacity: 0.25,
+        opacity: Math.min(effectiveOpacity, 0.25),
         transmission: 0.88,
         roughness: 0.12,
         depthWrite: false,
@@ -2075,71 +2083,98 @@ export const BrainMap: React.FC<BrainMapProps> = ({
             </div>
           </div>
 
-          {/* Floating Canvas Bottom Overlay: CT Slice Plane Simulator */}
-          <div className="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur-md p-3 rounded-2xl border border-slate-800 pointer-events-auto z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xl">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5 text-xs text-slate-300 font-semibold">
-                <Layers className="w-4 h-4 text-sky-400" />
-                <span>CT Slicing Plane:</span>
+          {/* Floating Canvas Bottom Overlay: CT Slice Plane Simulator & Cortical Peel */}
+          <div className="absolute bottom-4 left-4 right-4 bg-slate-900/95 backdrop-blur-md p-3 rounded-2xl border border-slate-800 pointer-events-auto z-10 flex flex-col gap-2.5 shadow-2xl">
+            {/* Top row: CT Slice plane and Toggles */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 text-xs text-slate-300 font-semibold">
+                  <Layers className="w-4 h-4 text-sky-400" />
+                  <span>CT Slicing Plane:</span>
+                </div>
+                <button
+                  onClick={() => setShowSlicePlane(!showSlicePlane)}
+                  className={`text-[10px] px-2 py-0.5 rounded-lg font-bold border transition-all ${
+                    showSlicePlane
+                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                      : 'bg-slate-800 text-slate-500 border-slate-700'
+                  }`}
+                >
+                  {showSlicePlane ? 'Visible' : 'Hidden'}
+                </button>
               </div>
-              <button
-                onClick={() => setShowSlicePlane(!showSlicePlane)}
-                className={`text-[10px] px-2 py-0.5 rounded-lg font-bold border transition-all ${
-                  showSlicePlane
-                    ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
-                    : 'bg-slate-800 text-slate-500 border-slate-700'
-                }`}
-              >
-                {showSlicePlane ? 'Visible' : 'Hidden'}
-              </button>
+
+              {showSlicePlane && (
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className="flex items-center gap-1">
+                    {(['axial', 'coronal', 'sagittal'] as const).map(axis => (
+                      <button
+                        key={axis}
+                        onClick={() => setSliceAxis(axis)}
+                        className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-lg transition-all ${
+                          sliceAxis === axis
+                            ? 'bg-sky-600 text-white'
+                            : 'text-slate-400 hover:text-slate-200 bg-slate-800'
+                        }`}
+                      >
+                        {axis}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-1 sm:w-36">
+                    <span className="text-[10px] text-slate-400 font-mono">-1.5</span>
+                    <input
+                      type="range"
+                      min="-1.5"
+                      max="1.5"
+                      step="0.05"
+                      value={slicePosition}
+                      onChange={(e) => setSlicePosition(parseFloat(e.target.value))}
+                      className="w-full accent-sky-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+                    />
+                    <span className="text-[10px] text-slate-400 font-mono">+1.5</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowPins(!showPins)}
+                  className={`text-[10px] px-2 py-1 rounded-lg font-semibold flex items-center gap-1 border transition-all ${
+                    showPins 
+                      ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' 
+                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                  }`}
+                >
+                  <Crosshair className="w-3 h-3" />
+                  <span>{showPins ? 'Pins On' : 'Pins Off'}</span>
+                </button>
+              </div>
             </div>
 
-            {showSlicePlane && (
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <div className="flex items-center gap-1">
-                  {(['axial', 'coronal', 'sagittal'] as const).map(axis => (
-                    <button
-                      key={axis}
-                      onClick={() => setSliceAxis(axis)}
-                      className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-lg transition-all ${
-                        sliceAxis === axis
-                          ? 'bg-sky-600 text-white'
-                          : 'text-slate-400 hover:text-slate-200 bg-slate-800'
-                      }`}
-                    >
-                      {axis}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex items-center gap-2 flex-1 sm:w-36">
-                  <span className="text-[10px] text-slate-400 font-mono">-1.5</span>
-                  <input
-                    type="range"
-                    min="-1.5"
-                    max="1.5"
-                    step="0.05"
-                    value={slicePosition}
-                    onChange={(e) => setSlicePosition(parseFloat(e.target.value))}
-                    className="w-full accent-sky-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
-                  />
-                  <span className="text-[10px] text-slate-400 font-mono">+1.5</span>
-                </div>
+            {/* Bottom row: Cortical Peel / Transparency Dissection Slider */}
+            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 text-slate-300 font-medium">
+                <Eye className="w-3.5 h-3.5 text-pink-400" />
+                <span className="text-[11px]">Cortical Peel / Dissection Transparency:</span>
               </div>
-            )}
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowPins(!showPins)}
-                className={`text-[10px] px-2 py-1 rounded-lg font-semibold flex items-center gap-1 border transition-all ${
-                  showPins 
-                    ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' 
-                    : 'bg-slate-800 text-slate-400 border-slate-700'
-                }`}
-              >
-                <Crosshair className="w-3 h-3" />
-                <span>{showPins ? 'Pins On' : 'Pins Off'}</span>
-              </button>
+              <div className="flex items-center gap-2 w-44 sm:w-56">
+                <span className="text-[10px] text-slate-400 font-mono">Opaque</span>
+                <input
+                  type="range"
+                  min="0.15"
+                  max="1.0"
+                  step="0.05"
+                  value={cortexOpacity}
+                  onChange={(e) => setCortexOpacity(parseFloat(e.target.value))}
+                  className="w-full accent-pink-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+                  title="Peel away cortex to reveal deep ventricles and Circle of Willis"
+                />
+                <span className="text-[10px] text-pink-400 font-mono font-bold w-9 text-right">
+                  {Math.round(cortexOpacity * 100)}%
+                </span>
+              </div>
             </div>
           </div>
 
@@ -2239,6 +2274,28 @@ export const BrainMap: React.FC<BrainMapProps> = ({
         <div className="lg:col-span-5 xl:col-span-4 p-5 sm:p-6 bg-slate-900 flex flex-col justify-between border-t lg:border-t-0 lg:border-l border-slate-800 max-h-[640px] overflow-y-auto">
           <div className="space-y-4">
             
+            {/* Search Input Bar (Neurotorium style) */}
+            <div className="relative">
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <Search className="w-4 h-4 text-sky-400" />
+              </span>
+              <input
+                type="text"
+                placeholder="Find area in the brain..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all shadow-inner"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-slate-400 hover:text-white"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
             {/* Category Filter Pills */}
             <div>
               <div className="flex items-center justify-between mb-2">
