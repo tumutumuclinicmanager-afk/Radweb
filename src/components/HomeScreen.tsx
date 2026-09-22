@@ -32,6 +32,8 @@ import { sortCasesDeterministically } from '../services/casesService';
 import { getSafeImageUrl, handleImageError } from '../lib/imageUtils';
 import { FormattedText } from './FormattedText';
 import { BrainMap } from './BrainMap';
+import { ChestMap } from './ChestMap';
+import { Wind } from 'lucide-react';
 
 interface HomeScreenProps {
   setActiveView: (view: ActiveView) => void;
@@ -55,6 +57,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   isLoadingCases = false,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeAnatomyMap, setActiveAnatomyMap] = useState<'brain' | 'chest'>('brain');
   const [searchResults, setSearchResults] = useState<MedicalCase[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [copiedItem, setCopiedItem] = useState<string | null>(null);
@@ -479,16 +482,60 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </div>
         </div>
 
-        {/* --- 3D BRAIN MAP (NEUROANATOMY & CT CORRELATION) --- */}
-        <div id="brain-map-section" className="pt-2">
-          <BrainMap
-            cases={cases}
-            onSelectCase={onSelectCase}
-            onExploreHeadCt={() => {
-              setSelectedModality('head_ct');
-              setActiveView('cases');
-            }}
-          />
+        {/* --- 3D ANATOMICAL MAPS (BRAIN & CHEST) --- */}
+        <div id="brain-map-section" className="pt-2 space-y-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between bg-slate-800/80 p-2.5 rounded-2xl border border-slate-700 gap-3">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                onClick={() => setActiveAnatomyMap('brain')}
+                className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                  activeAnatomyMap === 'brain'
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white bg-slate-900/60'
+                }`}
+              >
+                <Brain className="w-4 h-4" />
+                <span>3D Brain Map</span>
+              </button>
+
+              <button
+                onClick={() => setActiveAnatomyMap('chest')}
+                className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                  activeAnatomyMap === 'chest'
+                    ? 'bg-teal-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-white bg-slate-900/60'
+                }`}
+              >
+                <Wind className="w-4 h-4" />
+                <span>3D Chest & Thorax Map</span>
+              </button>
+            </div>
+            <span className="text-[11px] text-slate-300 font-medium px-2 text-center sm:text-right">
+              Switch between Neuroanatomy & Thoracic Respiratory/Cardiovascular Atlases
+            </span>
+          </div>
+
+          <div>
+            {activeAnatomyMap === 'brain' ? (
+              <BrainMap
+                cases={cases}
+                onSelectCase={onSelectCase}
+                onExploreHeadCt={() => {
+                  setSelectedModality('head_ct');
+                  setActiveView('cases');
+                }}
+              />
+            ) : (
+              <ChestMap
+                cases={cases}
+                onSelectCase={onSelectCase}
+                onExploreChestXray={() => {
+                  setSelectedModality('chest_xray');
+                  setActiveView('cases');
+                }}
+              />
+            )}
+          </div>
         </div>
 
         {/* --- SECTION 2: HEAD CT CASES --- */}

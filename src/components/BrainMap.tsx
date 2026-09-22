@@ -258,6 +258,123 @@ export const BRAIN_REGIONS: BrainRegionInfo[] = [
     pinPosition: [0, -1.15, -1.35],
     cameraAngle: { x: -0.15, y: Math.PI, z: 4.8 },
   },
+  {
+    id: 'hippocampus_amygdala',
+    category: 'deep',
+    name: 'Hippocampus & Amygdala (Limbic Complex)',
+    latinName: 'Hippocampus & Corpus amygdaloideum',
+    color: '#f97316',
+    function: 'Episodic memory consolidation, spatial navigation (hippocampus), and emotional threat appraisal and fear conditioning (amygdala).',
+    radiologicalRelevance: 'Primary site of mesial temporal sclerosis in refractory epilepsy and early neuronal loss in Alzheimer disease.',
+    commonPathologies: ['Mesial Temporal Sclerosis', 'Alzheimer Neurofibrillary Degeneration', 'HSV Encephalitis', 'Temporal Lobe Epilepsy Focus'],
+    ctSliceLevel: 'Temporal Horn / Ambient Cistern Plane',
+    pinPosition: [1.1, -0.3, -0.4],
+    cameraAngle: { x: 0.1, y: -0.5, z: 4.5 },
+  },
+  {
+    id: 'pituitary_gland',
+    category: 'deep',
+    name: 'Pituitary Gland & Sella Turcica',
+    latinName: 'Glandula pituitaria (Hypophysis)',
+    color: '#eab308',
+    function: 'Master endocrine gland regulating HPA axis, thyroid function, growth hormone, and osmoregulation via portal blood system.',
+    radiologicalRelevance: 'Enclosed in sella turcica; macroadenomas expand superiorly to compress the optic chiasm, producing bitemporal hemianopia.',
+    commonPathologies: ['Pituitary Macroadenoma', 'Pituitary Apoplexy', "Rathke's Cleft Cyst", 'Empty Sella Syndrome'],
+    ctSliceLevel: 'Sella Turcica / Sphenoid Sinus Level',
+    pinPosition: [0, -0.9, 1.1],
+    cameraAngle: { x: -0.4, y: 0, z: 4.5 },
+  },
+  {
+    id: 'pineal_gland',
+    category: 'deep',
+    name: 'Pineal Gland',
+    latinName: 'Corpus pineale (Epiphysis)',
+    color: '#a855f7',
+    function: 'Endocrine gland synthesizing melatonin to modulate circadian rhythms and seasonal sleep-wake cycles.',
+    radiologicalRelevance: 'Frequently calcified on head CT as midline landmark; tumors (pinealoblastoma/germinoma) compress tectal plate causing Parinaud syndrome.',
+    commonPathologies: ['Physiologic Pineal Calcification', 'Pineal Germinoma', 'Pinealoblastoma', 'Tectal Plate Compression'],
+    ctSliceLevel: 'Quadrigeminal Cistern Level',
+    pinPosition: [0, 0.2, -0.85],
+    cameraAngle: { x: 0.3, y: 0, z: 4.5 },
+  },
+  {
+    id: 'insular_cortex',
+    category: 'cortex',
+    name: 'Insular Cortex (Insula)',
+    latinName: 'Cortex insularis',
+    color: '#06b6d4',
+    function: 'Visceral sensory processing, gustatory integration, self-awareness, and emotional pain appraisal.',
+    radiologicalRelevance: 'Buried deep within the Sylvian fissure; "loss of insular ribbon" is a hallmark sign of hyperacute middle cerebral artery ischemia.',
+    commonPathologies: ['Hyperacute MCA Stroke (Loss of Insular Ribbon)', 'Insular Low-Grade Glioma', 'Central Pain Syndrome'],
+    ctSliceLevel: 'Basal Ganglia & Sylvian Plane',
+    pinPosition: [1.3, 0.1, 0.2],
+    cameraAngle: { x: 0.05, y: -0.7, z: 4.6 },
+  },
+  {
+    id: 'ica_artery',
+    category: 'vascular',
+    name: 'Internal Carotid Artery (ICA)',
+    latinName: 'Arteria carotis interna',
+    color: '#ef4444',
+    function: 'Primary arterial trunk supplying anterior circulation of cerebrum, orbits, and pituitary gland.',
+    radiologicalRelevance: 'Saccular aneurysms frequently develop at the ICA terminus or origin of the posterior communicating artery.',
+    commonPathologies: ['ICA Saccular Aneurysm', 'Carotid Siphon Atherosclerosis', 'Carotid Artery Dissection', 'Cavernous Sinus Fistula'],
+    ctSliceLevel: 'Suprasellar & Middle Fossa Level',
+    pinPosition: [0.7, -0.7, 0.5],
+    cameraAngle: { x: -0.3, y: -0.4, z: 4.5 },
+  },
+  {
+    id: 'aca_artery',
+    category: 'vascular',
+    name: 'Anterior Cerebral Artery (ACA)',
+    latinName: 'Arteria cerebri anterior',
+    color: '#f87171',
+    function: 'Supplies medial frontal and parietal lobes, including motor and sensory representations for lower extremities.',
+    radiologicalRelevance: 'Occlusion results in contralateral lower limb motor weakness and apraxia greater than upper limbs.',
+    commonPathologies: ['ACA Territory Ischemic Infarct', 'Falx Meningioma', 'ACom Aneurysm Rupture'],
+    ctSliceLevel: 'Interhemispheric Fissure & Vertex Level',
+    pinPosition: [0.3, 0.6, 1.1],
+    cameraAngle: { x: 0.1, y: 0, z: 4.6 },
+  },
+  {
+    id: 'mca_artery',
+    category: 'vascular',
+    name: 'Middle Cerebral Artery (MCA)',
+    latinName: 'Arteria cerebri media',
+    color: '#dc2626',
+    function: 'Supplies lateral hemispheric cortex, motor/sensory homunculus for face/hands, and dominant speech areas.',
+    radiologicalRelevance: 'Most common vessel involved in acute ischemic stroke, causing contralateral hemiplegia and aphasia.',
+    commonPathologies: ['M1/M2 Thromboembolic Occlusion', 'Hyperdense MCA Vessel Sign', 'MCA Bifurcation Aneurysm'],
+    ctSliceLevel: 'Sylvian Fissure & Basal Ganglia Plane',
+    pinPosition: [1.4, 0.2, 0.3],
+    cameraAngle: { x: 0.05, y: -0.8, z: 4.6 },
+  },
+  {
+    id: 'pca_artery',
+    category: 'vascular',
+    name: 'Posterior Cerebral Artery (PCA)',
+    latinName: 'Arteria cerebri posterior',
+    color: '#b91c1c',
+    function: 'Supplies occipital lobes (primary visual cortex), thalamus, and inferior temporal lobes.',
+    radiologicalRelevance: 'Occlusion causes contralateral homonymous hemianopia with characteristic macular sparing.',
+    commonPathologies: ['PCA Territory Infarct', 'Thalamic Stroke Syndrome', 'Occipital Lobar Hemorrhage'],
+    ctSliceLevel: 'Tentorial Apex & Quadrigeminal Level',
+    pinPosition: [0.5, -0.4, -1.2],
+    cameraAngle: { x: 0.2, y: Math.PI - 0.3, z: 4.7 },
+  },
+  {
+    id: 'basilar_artery',
+    category: 'vascular',
+    name: 'Basilar Artery',
+    latinName: 'Arteria basilaris',
+    color: '#991b1b',
+    function: 'Formed by vertebral artery union; supplies brainstem, cerebellum, and posterior cerebral circulation.',
+    radiologicalRelevance: 'Thrombosis of the basilar trunk causes catastrophic brainstem ischemia and "Locked-in Syndrome".',
+    commonPathologies: ['Basilar Artery Tip Occlusion', 'Pontine Ischemic Infarct', 'Basilar Dolichoectasia'],
+    ctSliceLevel: 'Prepontine Cistern Level',
+    pinPosition: [0, -1.0, -0.2],
+    cameraAngle: { x: -0.2, y: 0, z: 4.6 },
+  },
 ];
 
 type RenderMode = 'photoreal' | 'anatomic' | 'ct_window' | 'wireframe' | 'transparent_cortex';
@@ -268,6 +385,8 @@ export const BrainMap: React.FC<BrainMapProps> = ({
   onExploreHeadCt 
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
+  const containerWrapperRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -370,7 +489,48 @@ export const BrainMap: React.FC<BrainMapProps> = ({
   const [sliceAxis, setSliceAxis] = useState<'axial' | 'coronal' | 'sagittal'>('axial');
   const [zoomScale, setZoomScale] = useState<number>(1);
   const [cortexOpacity, setCortexOpacity] = useState<number>(1.0);
+  const [surfaceVsSliceFade, setSurfaceVsSliceFade] = useState<number>(0); // 0 = Surface View, 1 = Cross-Sectional Slice View
+  const [showCanvasAnnotations, setShowCanvasAnnotations] = useState<boolean>(true);
+  const [spatialMode, setSpatialMode] = useState<boolean>(false);
+  const [vrMode, setVrMode] = useState<boolean>(false);
+  const vrModeRef = useRef<boolean>(vrMode);
   const [searchTerm, setSearchTerm] = useState<string>('');
+
+  useEffect(() => {
+    vrModeRef.current = vrMode;
+  }, [vrMode]);
+
+  useEffect(() => {
+    if (!spatialMode) return;
+
+    const handleOrientation = (event: DeviceOrientationEvent) => {
+      if (!brainGroupRef.current) return;
+      const gamma = event.gamma || 0;
+      const beta = event.beta || 0;
+      brainGroupRef.current.rotation.y = THREE.MathUtils.degToRad(gamma * 0.8);
+      brainGroupRef.current.rotation.x = THREE.MathUtils.degToRad((beta - 45) * 0.8);
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!brainGroupRef.current) return;
+      const xNorm = (e.clientX / window.innerWidth) * 2 - 1;
+      const yNorm = -(e.clientY / window.innerHeight) * 2 + 1;
+      brainGroupRef.current.rotation.y = xNorm * 0.9;
+      brainGroupRef.current.rotation.x = -yNorm * 0.9;
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('deviceorientation', handleOrientation);
+      window.addEventListener('mousemove', handleMouseMove);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('deviceorientation', handleOrientation);
+        window.removeEventListener('mousemove', handleMouseMove);
+      }
+    };
+  }, [spatialMode]);
 
   // Floating callout showing the name of the clicked area
   const [clickCallout, setClickCallout] = useState<{
@@ -1387,7 +1547,31 @@ export const BrainMap: React.FC<BrainMapProps> = ({
         }
       }
 
-      renderer.render(scene, camera);
+      if (vrModeRef.current) {
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        const halfW = width / 2;
+
+        renderer.setScissorTest(true);
+
+        // Left Eye
+        renderer.setViewport(0, 0, halfW, height);
+        renderer.setScissor(0, 0, halfW, height);
+        camera.position.x = -0.032;
+        renderer.render(scene, camera);
+
+        // Right Eye
+        renderer.setViewport(halfW, 0, halfW, height);
+        renderer.setScissor(halfW, 0, halfW, height);
+        camera.position.x = 0.032;
+        renderer.render(scene, camera);
+
+        renderer.setScissorTest(false);
+        camera.position.x = 0;
+      } else {
+        renderer.setViewport(0, 0, container.clientWidth, container.clientHeight);
+        renderer.render(scene, camera);
+      }
     };
     animate();
 
@@ -1766,7 +1950,7 @@ export const BrainMap: React.FC<BrainMapProps> = ({
   };
 
   return (
-    <div className="w-full bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl text-white">
+    <div ref={containerWrapperRef} className={`w-full bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl text-white ${isFullscreen ? 'fixed inset-0 z-50 rounded-none overflow-y-auto' : ''}`}>
       {/* Top Banner Header */}
       <div className="p-5 sm:p-6 bg-gradient-to-r from-indigo-950 via-slate-900 to-slate-900 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
@@ -1815,6 +1999,22 @@ export const BrainMap: React.FC<BrainMapProps> = ({
             title="Reset Camera to Anterior"
           >
             <Compass className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={() => {
+              if (!containerWrapperRef.current) return;
+              if (!document.fullscreenElement) {
+                containerWrapperRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(console.error);
+              } else {
+                document.exitFullscreen().then(() => setIsFullscreen(false)).catch(console.error);
+              }
+            }}
+            className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors text-xs font-semibold flex items-center gap-1.5"
+            title="Toggle Fullscreen View"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+            <span>{isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}</span>
           </button>
 
           <div className="h-6 w-px bg-slate-800 hidden sm:block"></div>
@@ -2150,6 +2350,69 @@ export const BrainMap: React.FC<BrainMapProps> = ({
                   <Crosshair className="w-3 h-3" />
                   <span>{showPins ? 'Pins On' : 'Pins Off'}</span>
                 </button>
+
+                <button
+                  onClick={() => setShowCanvasAnnotations(!showCanvasAnnotations)}
+                  className={`text-[10px] px-2 py-1 rounded-lg font-semibold flex items-center gap-1 border transition-all ${
+                    showCanvasAnnotations 
+                      ? 'bg-sky-500/20 text-sky-300 border-sky-500/30' 
+                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                  }`}
+                  title="Toggle 3D textual annotations over major brain structures"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>{showCanvasAnnotations ? 'Labels On' : 'Labels Off'}</span>
+                </button>
+
+                <button
+                  onClick={async () => {
+                    if (!spatialMode) {
+                      if (typeof (DeviceOrientationEvent as any)?.requestPermission === 'function') {
+                        try {
+                          const res = await (DeviceOrientationEvent as any).requestPermission();
+                          if (res === 'granted') {
+                            setSpatialMode(true);
+                            setAutoRotate(false);
+                          }
+                        } catch (err) {
+                          console.error(err);
+                        }
+                      } else {
+                        setSpatialMode(true);
+                        setAutoRotate(false);
+                      }
+                    } else {
+                      setSpatialMode(false);
+                      setVrMode(false);
+                    }
+                  }}
+                  className={`text-[10px] px-2 py-1 rounded-lg font-semibold flex items-center gap-1 border transition-all ${
+                    spatialMode 
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
+                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                  }`}
+                  title="Use device gyroscope or mouse movement to inspect the model in spatial mode"
+                >
+                  <Compass className="w-3 h-3" />
+                  <span>{spatialMode ? 'Spatial: On' : 'Spatial Mode'}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const next = !vrMode;
+                    setVrMode(next);
+                    if (next) setSpatialMode(true);
+                  }}
+                  className={`text-[10px] px-2 py-1 rounded-lg font-semibold flex items-center gap-1 border transition-all ${
+                    vrMode 
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/30' 
+                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                  }`}
+                  title="Toggle Google Cardboard stereoscopic side-by-side VR view"
+                >
+                  <Maximize2 className="w-3 h-3" />
+                  <span>{vrMode ? 'VR: On' : 'Cardboard VR'}</span>
+                </button>
               </div>
             </div>
 
@@ -2176,7 +2439,109 @@ export const BrainMap: React.FC<BrainMapProps> = ({
                 </span>
               </div>
             </div>
+
+            {/* Cross-Sectional Slice Fade & Circle of Willis Quick Label */}
+            <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 text-slate-300 font-medium">
+                <Sliders className="w-3.5 h-3.5 text-sky-400" />
+                <span className="text-[11px]">Surface ⇄ Cross-Sectional Slice:</span>
+              </div>
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="flex items-center gap-2 w-44 sm:w-56">
+                  <span className="text-[10px] text-slate-400 font-mono">Surface</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={surfaceVsSliceFade}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setSurfaceVsSliceFade(val);
+                      if (val > 0.1) {
+                        setShowSlicePlane(true);
+                        setSlicePosition(THREE.MathUtils.lerp(0.2, -0.8, val));
+                      } else {
+                        setShowSlicePlane(false);
+                      }
+                    }}
+                    className="w-full accent-sky-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+                    title="Fade between 3D surface view and cross-sectional slice view"
+                  />
+                  <span className="text-[10px] text-sky-400 font-mono font-bold w-9 text-right">
+                    {Math.round(surfaceVsSliceFade * 100)}%
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setSelectedRegionId('circle_of_willis');
+                    setSurfaceVsSliceFade(0.65);
+                    setShowSlicePlane(true);
+                    setSlicePosition(-0.35);
+                  }}
+                  className="px-2.5 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 rounded-xl font-bold text-[10px] flex items-center gap-1.5 transition-all shadow-md"
+                  title="Instantly label and inspect the Circle of Willis"
+                >
+                  <HeartPulse className="w-3 h-3 text-red-400 animate-pulse" />
+                  <span>Label Circle of Willis</span>
+                </button>
+              </div>
+            </div>
           </div>
+
+          {/* 3D Canvas Textual Annotations Overlay for Learning */}
+          {showCanvasAnnotations && (
+            <div className="absolute inset-0 pointer-events-none overflow-hidden z-10">
+              {/* Frontal Lobe Annotation */}
+              <div className="absolute top-[28%] left-[58%] transform -translate-x-1/2 pointer-events-auto cursor-pointer" onClick={() => setSelectedRegionId('prefrontal')}>
+                <div className="bg-slate-900/85 backdrop-blur-md text-white px-2.5 py-1.5 rounded-lg border border-blue-500/50 shadow-xl flex items-center gap-1.5 hover:scale-105 transition-transform">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                  <span className="text-[11px] font-bold">Frontal Lobe (Prefrontal)</span>
+                </div>
+              </div>
+
+              {/* Cerebellum Annotation */}
+              <div className="absolute bottom-[32%] right-[22%] pointer-events-auto cursor-pointer" onClick={() => setSelectedRegionId('cerebellum')}>
+                <div className="bg-slate-900/85 backdrop-blur-md text-white px-2.5 py-1.5 rounded-lg border border-pink-500/50 shadow-xl flex items-center gap-1.5 hover:scale-105 transition-transform">
+                  <span className="w-2 h-2 rounded-full bg-pink-500" />
+                  <span className="text-[11px] font-bold">Cerebellum</span>
+                </div>
+              </div>
+
+              {/* Brainstem / Pons Annotation */}
+              <div className="absolute bottom-[22%] left-[48%] transform -translate-x-1/2 pointer-events-auto cursor-pointer" onClick={() => setSelectedRegionId('pons')}>
+                <div className="bg-slate-900/85 backdrop-blur-md text-white px-2.5 py-1.5 rounded-lg border border-teal-500/50 shadow-xl flex items-center gap-1.5 hover:scale-105 transition-transform">
+                  <span className="w-2 h-2 rounded-full bg-teal-400" />
+                  <span className="text-[11px] font-bold">Brainstem (Pons)</span>
+                </div>
+              </div>
+
+              {/* Circle of Willis Annotation */}
+              <div className="absolute bottom-[40%] left-[38%] pointer-events-auto cursor-pointer" onClick={() => setSelectedRegionId('circle_of_willis')}>
+                <div className="bg-slate-900/85 backdrop-blur-md text-white px-2.5 py-1.5 rounded-lg border border-red-500/60 shadow-xl flex items-center gap-1.5 hover:scale-105 transition-transform">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                  <span className="text-[11px] font-bold text-red-300">Circle of Willis (Arteries)</span>
+                </div>
+              </div>
+
+              {/* Occipital Lobe Annotation */}
+              <div className="absolute top-[42%] left-[22%] pointer-events-auto cursor-pointer" onClick={() => setSelectedRegionId('occipital')}>
+                <div className="bg-slate-900/85 backdrop-blur-md text-white px-2.5 py-1.5 rounded-lg border border-amber-500/50 shadow-xl flex items-center gap-1.5 hover:scale-105 transition-transform">
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  <span className="text-[11px] font-bold">Occipital Lobe</span>
+                </div>
+              </div>
+
+              {/* Hippocampus Annotation */}
+              <div className="absolute top-[52%] right-[32%] pointer-events-auto cursor-pointer" onClick={() => setSelectedRegionId('hippocampus_amygdala')}>
+                <div className="bg-slate-900/85 backdrop-blur-md text-white px-2.5 py-1.5 rounded-lg border border-orange-500/50 shadow-xl flex items-center gap-1.5 hover:scale-105 transition-transform">
+                  <span className="w-2 h-2 rounded-full bg-orange-500" />
+                  <span className="text-[11px] font-bold">Hippocampus & Amygdala</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Interactive Hint Indicator */}
           <div className="absolute bottom-18 left-1/2 -translate-x-1/2 pointer-events-none transition-all">
