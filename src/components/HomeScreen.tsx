@@ -34,6 +34,7 @@ import { FormattedText } from './FormattedText';
 import { BrainMap } from './BrainMap';
 import { ChestMap } from './ChestMap';
 import { Wind } from 'lucide-react';
+import DarkVeil from './DarkVeil';
 
 interface HomeScreenProps {
   setActiveView: (view: ActiveView) => void;
@@ -114,24 +115,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   return (
     <div className="min-h-[calc(100vh-4rem)] pb-20">
-      {/* Compact Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-b from-blue-900 via-slate-900 to-slate-950 text-white py-5 sm:py-6 px-4 sm:px-6">
-        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:16px_16px]"></div>
+      {/* Hero Section with DarkVeil */}
+      <div style={{ width: '100%', height: '600px', position: 'relative' }} className="overflow-hidden flex flex-col items-center justify-center text-white px-4">
+        <DarkVeil />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/20 via-slate-950/60 to-slate-950 pointer-events-none"></div>
         
         <div className="max-w-4xl mx-auto relative z-10 text-center">
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-[11px] font-semibold mb-2 backdrop-blur-md">
-            <Sparkles className="w-3 h-3 text-blue-400 animate-pulse" />
-            Continuous Medical Education • Interactive Radiology
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold mb-3 backdrop-blur-md">
+            <Sparkles className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
+            Radiology Education & Diagnostic Training
           </div>
 
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight mb-1.5 leading-tight">
+          <h1 className="text-2xl sm:text-3xl md:text-5xl font-extrabold tracking-tight mb-3 leading-tight">
             RadMed – Master{' '}
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-sky-300 to-indigo-300">
               Chest X-rays & Head CTs
             </span>
           </h1>
 
-          <p className="text-xs sm:text-sm text-slate-300 max-w-xl mx-auto mb-3 font-normal leading-normal">
+          <p className="text-sm sm:text-base text-slate-300 max-w-xl mx-auto mb-6 font-normal leading-normal">
             Explore curated radiographic and cross-sectional brain CT carousels for medical professionals and trainees.
           </p>
 

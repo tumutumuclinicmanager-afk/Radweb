@@ -241,6 +241,7 @@ export const ChestMap: React.FC<ChestMapProps> = ({
   const [selectedRegionId, setSelectedRegionId] = useState<string>('right_lung_lobes');
   const [activeTab, setActiveTab] = useState<'all' | 'respiratory' | 'cardiovascular' | 'pleural'>('all');
   const [viewScaleMode, setViewScaleMode] = useState<ViewScaleMode>('macro');
+  const [ecgData, setEcgData] = useState<{ time: number; voltage: number }[]>([]);
   const [autoRotate, setAutoRotate] = useState<boolean>(true);
   const autoRotateRef = useRef<boolean>(autoRotate);
 
@@ -820,15 +821,37 @@ export const ChestMap: React.FC<ChestMapProps> = ({
       const respCycle = (t * 1.45) % (Math.PI * 2);
       const breathInhalation = (Math.sin(respCycle) + 1) / 2;
 
-      if (chartTimer > 0.25 && viewScaleMode === 'alveolar') {
+      if (chartTimer > 0.12) {
         chartTimer = 0;
-        const po2Val = Math.round(40 + breathInhalation * 60);
-        const pco2Val = Math.round(46 - breathInhalation * 6);
-        setChartData(prev => {
-          const next = [...prev, { time: Math.round(t * 10) / 10, PO2: po2Val, PCO2: pco2Val }];
-          if (next.length > 25) next.shift();
-          return next;
-        });
+        if (heartCalloutMode && viewScaleMode === 'macro') {
+          const heartCycle = (t * 4.4) % (Math.PI * 2);
+          let ecgVal = 0.05 * Math.sin(heartCycle);
+          const qrsDist = Math.abs((heartCycle % Math.PI) - 0.5);
+          if (qrsDist < 0.25) {
+            ecgVal += 1.9 * Math.cos(qrsDist * Math.PI * 2);
+          }
+          const tWaveDist = Math.abs(heartCycle - 4.5);
+          if (tWaveDist < 0.4) {
+            ecgVal += 0.35 * Math.cos(tWaveDist * Math.PI * 1.25);
+          }
+          ecgVal += (Math.random() - 0.5) * 0.06;
+
+          setEcgData(prev => {
+            const next = [...prev, { time: Math.round(t * 10) / 10, voltage: Number(ecgVal.toFixed(2)) }];
+            if (next.length > 35) next.shift();
+            return next;
+          });
+        }
+
+        if (viewScaleMode === 'alveolar') {
+          const po2Val = Math.round(40 + breathInhalation * 60);
+          const pco2Val = Math.round(46 - breathInhalation * 6);
+          setChartData(prev => {
+            const next = [...prev, { time: Math.round(t * 10) / 10, PO2: po2Val, PCO2: pco2Val }];
+            if (next.length > 25) next.shift();
+            return next;
+          });
+        }
       }
 
       if (gainNodeRef.current && audioCtxRef.current && audioCtxRef.current.state === 'running') {
@@ -1414,48 +1437,76 @@ export const ChestMap: React.FC<ChestMapProps> = ({
                 </p>
               </div>
             ) : heartCalloutMode ? (
-              /* Heart Anatomy Callout Card */
-              <div className="bg-slate-950/90 p-5 rounded-2xl border border-rose-500/40 space-y-4 mb-4 shadow-xl">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                      {activeHeartCallout.type}
-                    </span>
-                    <h4 className="text-lg font-bold text-white mt-1 flex items-center gap-2">
-                      {activeHeartCallout.name}
+              <>
+                {/* Heart Anatomy Callout Card */}
+                <div className="bg-slate-950/90 p-5 rounded-2xl border border-rose-500/40 space-y-4 mb-4 shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                        {activeHeartCallout.type}
+                      </span>
+                      <h4 className="text-lg font-bold text-white mt-1 flex items-center gap-2">
+                        {activeHeartCallout.name}
+                      </h4>
+                      <p className="text-xs italic text-slate-400">{activeHeartCallout.latinName}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                      <span className="font-semibold text-rose-400 block mb-1">Functional Role:</span>
+                      <p className="text-slate-300 leading-relaxed">{activeHeartCallout.role}</p>
+                    </div>
+
+                    <div className="bg-slate-900 p-3 rounded-xl border border-slate-800">
+                      <span className="font-semibold text-teal-400 block mb-1">Cardiac Cycle Phase:</span>
+                      <p className="text-slate-200 font-medium">{activeHeartCallout.cardiacPhase}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1.5 pt-2">
+                    {Object.values(HEART_CHAMBERS).map(part => (
+                      <button
+                        key={part.id}
+                        onClick={() => setHoveredHeartPart(part.id)}
+                        className={`px-2 py-1.5 rounded-lg text-[10px] font-semibold transition-all border truncate ${
+                          hoveredHeartPart === part.id 
+                            ? 'bg-rose-600 text-white border-rose-500 shadow' 
+                            : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                        }`}
+                      >
+                        {part.name.split(' ')[0]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Real-Time Scrolling ECG Waveform Visualization */}
+                <div className="bg-slate-950/90 p-4 rounded-2xl border border-emerald-500/40 space-y-3 mb-4 shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-bold text-emerald-300 flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+                      <span>Live ECG Telemetry (Lead II)</span>
                     </h4>
-                    <p className="text-xs italic text-slate-400">{activeHeartCallout.latinName}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-3 text-xs">
-                  <div className="bg-slate-900 p-3 rounded-xl border border-slate-800">
-                    <span className="font-semibold text-rose-400 block mb-1">Functional Role:</span>
-                    <p className="text-slate-300 leading-relaxed">{activeHeartCallout.role}</p>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-mono">72 BPM • Synced</span>
                   </div>
 
-                  <div className="bg-slate-900 p-3 rounded-xl border border-slate-800">
-                    <span className="font-semibold text-teal-400 block mb-1">Cardiac Cycle Phase:</span>
-                    <p className="text-slate-200 font-medium">{activeHeartCallout.cardiacPhase}</p>
+                  <div className="h-40 w-full pt-1 bg-black/40 rounded-xl p-2 border border-emerald-500/20">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={ecgData} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="2 2" stroke="#064e3b" />
+                        <XAxis dataKey="time" stroke="#059669" fontSize={9} tickLine={false} />
+                        <YAxis stroke="#059669" fontSize={9} domain={[-1, 2.5]} tickLine={false} />
+                        <Line type="monotone" dataKey="voltage" stroke="#34d399" strokeWidth={2} dot={false} isAnimationActive={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-3 gap-1.5 pt-2">
-                  {Object.values(HEART_CHAMBERS).map(part => (
-                    <button
-                      key={part.id}
-                      onClick={() => setHoveredHeartPart(part.id)}
-                      className={`px-2 py-1.5 rounded-lg text-[10px] font-semibold transition-all border truncate ${
-                        hoveredHeartPart === part.id 
-                          ? 'bg-rose-600 text-white border-rose-500 shadow' 
-                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
-                      }`}
-                    >
-                      {part.name.split(' ')[0]}
-                    </button>
-                  ))}
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    R-wave spikes synchronize precisely with ventricular systole and electrical depolarization across the conduction pathway.
+                  </p>
                 </div>
-              </div>
+              </>
             ) : (
               <div className="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 space-y-3 mb-4 shadow-inner">
                 <div className="flex items-start justify-between">
